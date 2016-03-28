@@ -87,6 +87,7 @@ in_main_thread(void)
   return main_thread_id == tor_get_thread_id();
 }
 
+#ifndef _QUIC_SOCK_
 #if defined(HAVE_EVENTFD) || defined(HAVE_PIPE)
 /* As write(), but retry on EINTR */
 static int
@@ -111,14 +112,15 @@ read_ni(int fd, void *buf, size_t n)
   return r;
 }
 #endif
+#endif /*_QUIC_SOCK_ */
 
 /** As send(), but retry on EINTR. */
 static int
-send_ni(int fd, const void *buf, size_t n, int flags)
+send_ni(tor_socket_t fd, const void *buf, size_t n, int flags)
 {
   int r;
  again:
-  r = (int) send(fd, buf, n, flags);
+  r = (int) tor_socket_send(fd, buf, n, flags);
   if (r < 0 && ERRNO_IS_EINTR(tor_socket_errno(fd)))
     goto again;
   return r;
@@ -126,16 +128,19 @@ send_ni(int fd, const void *buf, size_t n, int flags)
 
 /** As recv(), but retry on EINTR. */
 static int
-recv_ni(int fd, void *buf, size_t n, int flags)
+recv_ni(tor_socket_t fd, void *buf, size_t n, int flags)
 {
   int r;
  again:
-  r = (int) recv(fd, buf, n, flags);
+  r = (int) tor_socket_recv(fd, buf, n, flags);
   if (r < 0 && ERRNO_IS_EINTR(tor_socket_errno(fd)))
     goto again;
   return r;
 }
 
+
+// FIXME
+#ifndef _QUIC_SOCK_
 #ifdef HAVE_EVENTFD
 /* Increment the event count on an eventfd <b>fd</b> */
 static int
@@ -188,6 +193,9 @@ pipe_drain(int fd)
 }
 #endif
 
+#endif /* _QUIC_SOCK_ */
+
+
 /** Send a byte on socket <b>fd</b>t.  Return 0 on success or EAGAIN,
  * -1 on error. */
 static int
@@ -221,6 +229,10 @@ int
 alert_sockets_create(alert_sockets_t *socks_out, uint32_t flags)
 {
   tor_socket_t socks[2] = { TOR_INVALID_SOCKET, TOR_INVALID_SOCKET };
+
+// Due to terrible coding assumptions about tor_socket_t being int, 
+// I have to disable all these and use socketpair FIXME
+#ifndef _QUIC_SOCK_
 
 #ifdef HAVE_EVENTFD
   /* First, we try the Linux eventfd() syscall.  This gives a 64-bit counter
@@ -281,6 +293,8 @@ alert_sockets_create(alert_sockets_t *socks_out, uint32_t flags)
   }
 #endif
 
+#endif /* _QUIC_SOCK_ */
+
   /* If nothing else worked, fall back on socketpair(). */
   if (!(flags & ASOCKS_NOSOCKETPAIR) &&
       tor_socketpair(AF_UNIX, SOCK_STREAM, 0, socks) == 0) {
@@ -303,6 +317,19 @@ alert_sockets_create(alert_sockets_t *socks_out, uint32_t flags)
 void
 alert_sockets_close(alert_sockets_t *socks)
 {
+  // THIS IS SO BAD! WHY WHY WHY WHY DO I HAVR TO DO THIS??
+#if defined(_QUIC_SOCK_)
+  
+  if (socks->alert_fn == sock_alert) {
+    /* they are sockets. */
+    tor_close_socket(socks->read_fd);
+    tor_close_socket(socks->write_fd);
+  } else {
+    exit(1); 
+  }
+  socks->read_fd = socks->write_fd = TOR_INVALID_SOCKET;
+
+#else 
   if (socks->alert_fn == sock_alert) {
     /* they are sockets. */
     tor_close_socket(socks->read_fd);
@@ -313,5 +340,6 @@ alert_sockets_close(alert_sockets_t *socks)
       close(socks->write_fd);
   }
   socks->read_fd = socks->write_fd = -1;
+#endif
 }
 

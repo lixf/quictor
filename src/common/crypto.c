@@ -2609,7 +2609,8 @@ crypto_strongest_rand_fallback(uint8_t *out, size_t out_len)
     fd = open(sandbox_intern_string(filenames[i]), O_RDONLY, 0);
     if (fd<0) continue;
     log_info(LD_CRYPTO, "Reading entropy from \"%s\"", filenames[i]);
-    n = read_all(fd, (char*)out, out_len, 0);
+    // FIXME
+    n = read_all((tor_socket_t)(uint64_t)(uint32_t)fd, (char*)out, out_len, 0);
     close(fd);
     if (n != out_len) {
       log_warn(LD_CRYPTO,

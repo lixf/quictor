@@ -57,6 +57,17 @@
 #error "It seems that you encode characters in something other than ASCII."
 #endif
 
+
+/* ==== simple quic entry point (for now) ==== */
+
+/* This needs better coordination with compiler flags. 
+ * We are only doing this for fast testing. FIXME */
+#define _QUIC_SOCK_
+
+#ifdef _QUIC_SOCK_
+#include "../simple-quic/quicsock/quicsock.h"
+#endif /* _QUIC_SOCK_ */
+
 /* ===== Compiler compatibility */
 
 /* GCC can check printf and scanf types on arbitrary functions. */
@@ -427,7 +438,18 @@ typedef int socklen_t;
 #define TOR_SOCKET_T_FORMAT INTPTR_T_FORMAT
 #define SOCKET_OK(s) ((SOCKET)(s) != INVALID_SOCKET)
 #define TOR_INVALID_SOCKET INVALID_SOCKET
+
 #else
+
+/* Redefine socket type for QUIC usage */
+#ifdef _QUIC_SOCK_
+#define tor_socket_t quicsock_t
+#define TOR_SOCKET_T_FORMAT "%d"
+#define SOCKET_OK(s) ((s) != NULL)
+#define TOR_INVALID_SOCKET NULL
+
+#else
+
 /** Type used for a network socket. */
 #define tor_socket_t int
 #define TOR_SOCKET_T_FORMAT "%d"
@@ -435,7 +457,9 @@ typedef int socklen_t;
 #define SOCKET_OK(s) ((s) >= 0)
 /** Error/uninitialized value for a tor_socket_t. */
 #define TOR_INVALID_SOCKET (-1)
-#endif
+#endif /* _QUIC_SOCK_ */
+
+#endif /* _WIN32 */
 
 int tor_close_socket_simple(tor_socket_t s);
 int tor_close_socket(tor_socket_t s);
@@ -454,7 +478,9 @@ tor_socket_t tor_accept_socket_with_extensions(tor_socket_t sockfd,
                                                struct sockaddr *addr,
                                                socklen_t *len,
                                                int cloexec, int nonblock);
-MOCK_DECL(tor_socket_t,
+// this used to return tor_socket_t --> bug? 
+// might cause problem in a test file test_address.c
+MOCK_DECL(int,
 tor_connect_socket,(tor_socket_t socket,const struct sockaddr *address,
                     socklen_t address_len));
 int get_n_open_sockets(void);
@@ -463,8 +489,15 @@ MOCK_DECL(int,
 tor_getsockname,(tor_socket_t socket, struct sockaddr *address,
                  socklen_t *address_len));
 
+#ifdef _QUIC_SOCK_
+#define tor_socket_send(s, buf, len, flags) qs_send(s, buf, len)
+#define tor_socket_recv(s, buf, len, flags) qs_recv(s, buf, len)
+
+#else 
+
 #define tor_socket_send(s, buf, len, flags) send(s, buf, len, flags)
 #define tor_socket_recv(s, buf, len, flags) recv(s, buf, len, flags)
+#endif
 
 /** Implementation of struct in6_addr for platforms that do not have it.
  * Generally, these platforms are ones without IPv6 support, but we want to

@@ -5,6 +5,7 @@
 *.swp
 # C stuff
 *.o
+*.so
 *.obj
 # Diff droppings
 *.orig
@@ -35,7 +36,7 @@ uptime-*.json
 *.last_modified
 
 # /
-/Makefile
+#/Makefile
 /Makefile.in
 /aclocal.m4
 /autom4te.cache

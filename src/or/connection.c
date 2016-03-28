@@ -624,7 +624,11 @@ connection_free_(connection_t *conn)
   }
 
   if (SOCKET_OK(conn->s)) {
+#ifdef _QUIC_SOCK_
+    log_debug(LD_NET,"closing fd %d.",qs_get_id(conn->s));
+#else
     log_debug(LD_NET,"closing fd %d.",(int)conn->s);
+#endif
     tor_close_socket(conn->s);
     conn->s = TOR_INVALID_SOCKET;
   }
@@ -742,10 +746,17 @@ connection_close_immediate(connection_t *conn)
     return;
   }
   if (conn->outbuf_flushlen) {
+#ifdef _QUIC_SOCK_
+    log_info(LD_NET,"fd %d, type %s, state %s, %d bytes on outbuf.",
+             qs_get_id(conn->s), conn_type_to_string(conn->type),
+             conn_state_to_string(conn->type, conn->state),
+             (int)conn->outbuf_flushlen);
+#else 
     log_info(LD_NET,"fd %d, type %s, state %s, %d bytes on outbuf.",
              (int)conn->s, conn_type_to_string(conn->type),
              conn_state_to_string(conn->type, conn->state),
              (int)conn->outbuf_flushlen);
+#endif
   }
 
   connection_unregister_events(conn);

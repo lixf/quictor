@@ -1571,7 +1571,9 @@ get_interface_address6_via_udp_socket_hack,(int severity,
                                             tor_addr_t *addr))
 {
   struct sockaddr_storage my_addr, target_addr;
-  int sock=-1, r=-1;
+  // bug fix for socket type
+  tor_socket_t sock = TOR_INVALID_SOCKET; 
+  int r=-1;
   socklen_t addr_len;
 
   memset(addr, 0, sizeof(tor_addr_t));
@@ -1599,7 +1601,7 @@ get_interface_address6_via_udp_socket_hack,(int severity,
     return -1;
   }
 
-  if (sock < 0) {
+  if (!SOCKET_OK(sock)) {
     int e = tor_socket_errno(-1);
     log_fn(severity, LD_NET, "unable to create socket: %s",
            tor_socket_strerror(e));
@@ -1630,7 +1632,7 @@ get_interface_address6_via_udp_socket_hack,(int severity,
  }
 
  err:
-  if (sock >= 0)
+  if (SOCKET_OK(sock))
     tor_close_socket(sock);
   if (r == -1)
     memset(addr, 0, sizeof(tor_addr_t));

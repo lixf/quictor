@@ -1113,7 +1113,12 @@ tor_close_socket_simple(tor_socket_t s)
   #if defined(_WIN32)
     r = closesocket(s);
   #else
+  #if defined(_QUIC_SOCK_)
+    r = 0; 
+    qs_close(s);
+  #else
     r = close(s);
+  #endif
   #endif
 
   if (r != 0) {
@@ -1131,6 +1136,10 @@ int
 tor_close_socket(tor_socket_t s)
 {
   int r = tor_close_socket_simple(s);
+
+#if defined(_QUIC_SOCK_)
+  // intentionally empty because of max_socket issue
+#else
 
   socket_accounting_lock();
 #ifdef DEBUG_SOCKET_COUNTING
@@ -1159,6 +1168,9 @@ tor_close_socket(tor_socket_t s)
     log_warn(LD_BUG, "Our socket count is below zero: %d. Please submit a "
              "bug report.", n_sockets_open);
   socket_accounting_unlock();
+
+#endif /* _QUIC_SOCK_ */
+  
   return r;
 }
 
@@ -1199,11 +1211,15 @@ tor_open_socket,(int domain, int type, int protocol))
 }
 
 /** Mockable wrapper for connect(). */
-MOCK_IMPL(tor_socket_t,
-tor_connect_socket,(tor_socket_t socket,const struct sockaddr *address,
+MOCK_IMPL(int,
+tor_connect_socket,(tor_socket_t socket, const struct sockaddr *address,
                      socklen_t address_len))
 {
-  return connect(socket,address,address_len);
+  #if defined(_QUIC_SOCK_)
+  return qs_connect(socket, address); 
+  #else
+  return connect(socket, address, address_len);
+  #endif 
 }
 
 /** As socket(), but creates a nonblocking socket and
@@ -1223,6 +1239,15 @@ tor_open_socket_with_extensions(int domain, int type, int protocol,
                                 int cloexec, int nonblock)
 {
   tor_socket_t s;
+
+#if defined(_QUIC_SOCK_)
+  // should check number of sockets open
+
+  s = qs_open();
+  if (!SOCKET_OK(s))
+    return s;
+
+#else
 
   /* We are about to create a new file descriptor so make sure we have
    * enough of them. */
@@ -1263,6 +1288,8 @@ tor_open_socket_with_extensions(int domain, int type, int protocol,
 #else
   (void)cloexec;
 #endif
+
+#endif /* _QUIC_SOCK_ */
 
   if (nonblock) {
     if (set_socket_nonblocking(s) == -1) {
@@ -1305,6 +1332,12 @@ tor_socket_t
 tor_accept_socket_with_extensions(tor_socket_t sockfd, struct sockaddr *addr,
                                  socklen_t *len, int cloexec, int nonblock)
 {
+#if defined(_QUIC_SOCK_) 
+  tor_socket_t s;
+
+  // don't do anything yet FIXME
+  s = qs_accept(sockfd); 
+#else 
   tor_socket_t s;
 
   /* We are about to create a new file descriptor so make sure we have
@@ -1362,6 +1395,8 @@ tor_accept_socket_with_extensions(tor_socket_t sockfd, struct sockaddr *addr,
   ++n_sockets_open;
   mark_socket_open(s);
   socket_accounting_unlock();
+
+#endif /* _QUIC_SOCK_ */
   return s;
 }
 
@@ -1381,7 +1416,11 @@ MOCK_IMPL(int,
 tor_getsockname,(tor_socket_t socket, struct sockaddr *address,
                  socklen_t *address_len))
 {
+#if defined(_QUIC_SOCK_) 
+   return 0; // always return 0 first FIXME
+#else 
    return getsockname(socket, address, address_len);
+#endif
 }
 
 /** Turn <b>socket</b> into a nonblocking socket. Return 0 on success, -1
@@ -1390,6 +1429,9 @@ tor_getsockname,(tor_socket_t socket, struct sockaddr *address,
 int
 set_socket_nonblocking(tor_socket_t socket)
 {
+#if defined(_QUIC_SOCK_) 
+#else 
+
 #if defined(_WIN32)
   unsigned long nonblocking = 1;
   ioctlsocket(socket, FIONBIO, (unsigned long*) &nonblocking);
@@ -1407,6 +1449,8 @@ set_socket_nonblocking(tor_socket_t socket)
     return -1;
   }
 #endif
+
+#endif /* _QUIC_SOCK_ */
 
   return 0;
 }
@@ -1431,6 +1475,10 @@ set_socket_nonblocking(tor_socket_t socket)
 int
 tor_socketpair(int family, int type, int protocol, tor_socket_t fd[2])
 {
+#if defined(_QUIC_SOCK_)
+  return -1; 
+#else
+
 //don't use win32 socketpairs (they are always bad)
 #if defined(HAVE_SOCKETPAIR) && !defined(_WIN32)
   int r;
@@ -1485,7 +1533,8 @@ tor_socketpair(int family, int type, int protocol, tor_socket_t fd[2])
   return 0;
 #else
   return tor_ersatz_socketpair(family, type, protocol, fd);
-#endif
+#endif /* _WIN32 */
+#endif /* _QUIC_SOCK_ */
 }
 
 #ifdef NEED_ERSATZ_SOCKETPAIR
@@ -1581,22 +1630,35 @@ tor_ersatz_socketpair(int family, int type, int protocol, tor_socket_t fd[2])
                          0 /* kernel chooses port.  */,
                          listen_addr,
                          sizeof(listen_addr_ss));
+#if defined(_QUIC_SOCK_)
+    if (qs_bind(listener, listen_addr) == -1)
+      goto tidy_up_and_fail;
+    if (qs_listen(listener) == -1)
+      goto tidy_up_and_fail;
+#else
     if (bind(listener, listen_addr, size) == -1)
       goto tidy_up_and_fail;
     if (listen(listener, 1) == -1)
       goto tidy_up_and_fail;
+#endif
+
 
     connector = tor_open_socket(ersatz_domain, type, 0);
     if (!SOCKET_OK(connector))
       goto tidy_up_and_fail;
     /* We want to find out the port number to connect to.  */
     size = sizeof(connect_addr_ss);
-    if (getsockname(listener, connect_addr, &size) == -1)
+    if (tor_getsockname(listener, connect_addr, &size) == -1)
       goto tidy_up_and_fail;
     if (size != SIZEOF_SOCKADDR (connect_addr->sa_family))
       goto abort_tidy_up_and_fail;
+#if defined(_QUIC_SOCK_)
+    if (qs_connect(connector, connect_addr) == -1)
+      goto tidy_up_and_fail;
+#else
     if (connect(connector, connect_addr, size) == -1)
       goto tidy_up_and_fail;
+#endif
 
     size = sizeof(listen_addr_ss);
     acceptor = tor_accept_socket(listener, listen_addr, &size);
@@ -1606,7 +1668,7 @@ tor_ersatz_socketpair(int family, int type, int protocol, tor_socket_t fd[2])
       goto abort_tidy_up_and_fail;
     /* Now check we are talking to ourself by matching port and host on the
        two sockets.  */
-    if (getsockname(connector, connect_addr, &size) == -1)
+    if (tor_getsockname(connector, connect_addr, &size) == -1)
       goto tidy_up_and_fail;
     /* Set *_tor_addr and *_port to the address and port that was used */
     tor_addr_from_sockaddr(&listen_tor_addr, listen_addr, &listen_port);

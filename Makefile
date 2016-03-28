@@ -1590,7 +1590,7 @@ src_or_tor_LDFLAGS =
 src_or_tor_LDADD = src/or/libtor.a src/common/libor.a \
 	src/common/libor-crypto.a $(LIBKECCAK_TINY) $(LIBDONNA) \
 	src/common/libor-event.a src/trunnel/libor-trunnel.a \
-	-lz -lm -levent -lssl -lcrypto -Lsrc/quic -lquicsock \
+	-lz -lm -levent -lssl -lcrypto -Lsrc/simple-quic -lquicsock \
 	   
 
 #src_or_tor_cov_SOURCES = src/or/tor_main.c
