@@ -625,7 +625,7 @@ connection_free_(connection_t *conn)
 
   if (SOCKET_OK(conn->s)) {
 #ifdef _QUIC_SOCK_
-    log_debug(LD_NET,"closing fd %d.",qs_get_id(conn->s));
+    log_debug(LD_NET,"closing fd %lu.",qs_get_id(conn->s));
 #else
     log_debug(LD_NET,"closing fd %d.",(int)conn->s);
 #endif
@@ -747,7 +747,7 @@ connection_close_immediate(connection_t *conn)
   }
   if (conn->outbuf_flushlen) {
 #ifdef _QUIC_SOCK_
-    log_info(LD_NET,"fd %d, type %s, state %s, %d bytes on outbuf.",
+    log_info(LD_NET,"fd %lu, type %s, state %s, %d bytes on outbuf.",
              qs_get_id(conn->s), conn_type_to_string(conn->type),
              conn_state_to_string(conn->type, conn->state),
              (int)conn->outbuf_flushlen);
@@ -872,11 +872,19 @@ connection_expire_held_open(void)
           severity = LOG_INFO;
         else
           severity = LOG_NOTICE;
+#ifdef _QUIC_SOCK_
+        log_fn(severity, LD_NET,
+               "Giving up on marked_for_close conn that's been flushing "
+               "for 15s (fd %lu, type %s, state %s).",
+               qs_get_id(conn->s), conn_type_to_string(conn->type),
+               conn_state_to_string(conn->type, conn->state));
+#else
         log_fn(severity, LD_NET,
                "Giving up on marked_for_close conn that's been flushing "
                "for 15s (fd %d, type %s, state %s).",
                (int)conn->s, conn_type_to_string(conn->type),
                conn_state_to_string(conn->type, conn->state));
+#endif
         conn->hold_open_until_flushed = 0;
       }
     }
@@ -1051,7 +1059,7 @@ check_location_for_unix_socket(const or_options_t *options, const char *path,
 static int
 make_socket_reuseable(tor_socket_t sock)
 {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(_QUIC_SOCK_)
   (void) sock;
   return 0;
 #else
@@ -1070,7 +1078,9 @@ make_socket_reuseable(tor_socket_t sock)
 }
 
 /** Max backlog to pass to listen.  We start at */
+#ifndef _QUIC_SOCK_
 static int listen_limit = INT_MAX;
+#endif
 
 /* Listen on <b>fd</b> with appropriate backlog. Return as for listen. */
 static int
@@ -1078,6 +1088,9 @@ tor_listen(tor_socket_t fd)
 {
   int r;
 
+#if defined(_QUIC_SOCK_) 
+  r = qs_listen(fd); 
+#else
   if ((r = listen(fd, listen_limit)) < 0) {
     if (listen_limit == SOMAXCONN)
       return r;
@@ -1087,6 +1100,7 @@ tor_listen(tor_socket_t fd)
                "didn't work, but SOMAXCONN did. Lowering backlog limit.");
     }
   }
+#endif
   return r;
 }
 
@@ -1146,7 +1160,7 @@ connection_listener_new(const struct sockaddr *listensockaddr,
                tor_socket_strerror(errno));
     }
 
-#if defined(USE_TRANSPARENT) && defined(IP_TRANSPARENT)
+#if defined(USE_TRANSPARENT) && defined(IP_TRANSPARENT) && !defined(_QUIC_SOCK_)
     if (options->TransProxyType_parsed == TPT_TPROXY &&
         type == CONN_TYPE_AP_TRANS_LISTENER) {
       int one = 1;
@@ -1163,7 +1177,7 @@ connection_listener_new(const struct sockaddr *listensockaddr,
     }
 #endif
 
-#ifdef IPV6_V6ONLY
+#if defined(IPV6_V6ONLY) && !defined(_QUIC_SOCK_)
     if (listensockaddr->sa_family == AF_INET6) {
       int one = 1;
       /* We need to set IPV6_V6ONLY so that this socket can't get used for
@@ -1178,7 +1192,11 @@ connection_listener_new(const struct sockaddr *listensockaddr,
     }
 #endif
 
+#ifdef _QUIC_SOCK_
+    if (qs_bind(s,listensockaddr) < 0) {
+#else 
     if (bind(s,listensockaddr,socklen) < 0) {
+#endif
       const char *helpfulhint = "";
       int e = tor_socket_errno(s);
       if (ERRNO_IS_EADDRINUSE(e))
@@ -1201,8 +1219,12 @@ connection_listener_new(const struct sockaddr *listensockaddr,
     } else {
       tor_addr_t addr2;
       struct sockaddr_storage ss;
+#ifdef _QUIC_SOCK_
+      if (1) {
+#else
       socklen_t ss_len=sizeof(ss);
       if (getsockname(s, (struct sockaddr*)&ss, &ss_len)<0) {
+#endif
         log_warn(LD_NET, "getsockname() couldn't learn address for %s: %s",
                  conn_type_to_string(type),
                  tor_socket_strerror(tor_socket_errno(s)));
@@ -1249,8 +1271,12 @@ connection_listener_new(const struct sockaddr *listensockaddr,
       goto err;
     }
 
+#ifdef _QUIC_SOCK_
+    if (qs_bind(s, listensockaddr) == -1) {
+#else
     if (bind(s, listensockaddr,
              (socklen_t)sizeof(struct sockaddr_un)) == -1) {
+#endif
       log_warn(LD_NET,"Bind to %s failed: %s.", address,
                tor_socket_strerror(tor_socket_errno(s)));
       goto err;
@@ -1292,7 +1318,11 @@ connection_listener_new(const struct sockaddr *listensockaddr,
       }
     }
 
+#ifdef _QUIC_SOCK_
+    if (qs_listen(s) < 0) {
+#else
     if (listen(s, SOMAXCONN) < 0) {
+#endif
       log_warn(LD_NET, "Could not listen on %s: %s", address,
                tor_socket_strerror(tor_socket_errno(s)));
       goto err;
@@ -1462,9 +1492,15 @@ connection_handle_listener_read(connection_t *conn, int new_type)
     connection_mark_for_close(conn);
     return -1;
   }
+#ifdef _QUIC_SOCK_
+  log_debug(LD_NET,
+            "Connection accepted on socket %lu (child of fd %lu).",
+            qs_get_id(news),qs_get_id(conn->s));
+#else
   log_debug(LD_NET,
             "Connection accepted on socket %d (child of fd %d).",
             (int)news,(int)conn->s);
+#endif
 
   if (make_socket_reuseable(news) < 0) {
     if (tor_socket_errno(news) == EINVAL) {
@@ -1685,7 +1721,11 @@ connection_connect_sockaddr,(connection_t *conn,
              tor_socket_strerror(errno));
   }
 
+#ifdef _QUIC_SOCK_
+  if (bindaddr && qs_bind(s, bindaddr) < 0) {
+#else 
   if (bindaddr && bind(s, bindaddr, bindaddr_len) < 0) {
+#endif
     *socket_error = tor_socket_errno(s);
     log_warn(LD_NET,"Error binding network socket: %s",
              tor_socket_strerror(*socket_error));
@@ -1697,7 +1737,11 @@ connection_connect_sockaddr,(connection_t *conn,
   if (options->ConstrainedSockets)
     set_constrained_socket_buffers(s, (int)options->ConstrainedSockSize);
 
+#ifdef _QUIC_SOCK_
+  if (qs_connect(s, sa) < 0) {
+#else 
   if (connect(s, sa, sa_len) < 0) {
+#endif
     int e = tor_socket_errno(s);
     if (!ERRNO_IS_CONN_EINPROGRESS(e)) {
       /* yuck. kill it. */
@@ -3174,8 +3218,13 @@ connection_bucket_refill(int milliseconds_elapsed, time_t now)
             conn->state != OR_CONN_STATE_OPEN ||
             TO_OR_CONN(conn)->read_bucket > 0)) {
         /* and either a non-cell conn or a cell conn with non-empty bucket */
+#ifdef _QUIC_SOCK_
+      LOG_FN_CONN(conn, (LOG_DEBUG,LD_NET,
+                         "waking up conn (fd %lu) for read", qs_get_id(conn->s)));
+#else
       LOG_FN_CONN(conn, (LOG_DEBUG,LD_NET,
                          "waking up conn (fd %d) for read", (int)conn->s));
+#endif
       conn->read_blocked_on_bw = 0;
       connection_start_reading(conn);
     }
@@ -3187,8 +3236,13 @@ connection_bucket_refill(int milliseconds_elapsed, time_t now)
         && (!connection_speaks_cells(conn) ||
             conn->state != OR_CONN_STATE_OPEN ||
             TO_OR_CONN(conn)->write_bucket > 0)) {
+#ifdef _QUIC_SOCK_
+      LOG_FN_CONN(conn, (LOG_DEBUG,LD_NET,
+                         "waking up conn (fd %lu) for write", qs_get_id(conn->s)));
+#else
       LOG_FN_CONN(conn, (LOG_DEBUG,LD_NET,
                          "waking up conn (fd %d) for write", (int)conn->s));
+#endif
       conn->write_blocked_on_bw = 0;
       connection_start_writing(conn);
     }
@@ -3460,6 +3514,7 @@ connection_read_to_buf(connection_t *conn, ssize_t *max_to_read,
     more_to_read = 0;
   }
 
+#ifndef _QUIC_SOCK_
   if (connection_speaks_cells(conn) &&
       conn->state > OR_CONN_STATE_PROXY_HANDSHAKING) {
     int pending;
@@ -3569,6 +3624,37 @@ connection_read_to_buf(connection_t *conn, ssize_t *max_to_read,
       return -1;
     n_read = (size_t) result;
   }
+
+#else
+  if (conn->linked) {
+    if (conn->linked_conn) {
+      result = move_buf_to_buf(conn->inbuf, conn->linked_conn->outbuf,
+                               &conn->linked_conn->outbuf_flushlen);
+    } else {
+      result = 0;
+    }
+    /* If the other side has disappeared, or if it's been marked for close and
+     * we flushed its outbuf, then we should set our inbuf_reached_eof. */
+    if (!conn->linked_conn ||
+        (conn->linked_conn->marked_for_close &&
+         buf_datalen(conn->linked_conn->outbuf) == 0))
+      conn->inbuf_reached_eof = 1;
+
+    n_read = (size_t) result;
+  } else {
+    int reached_eof = 0;
+    CONN_LOG_PROTECT(conn,
+        result = read_to_buf(conn->s, at_most, conn->inbuf, &reached_eof,
+                             socket_error));
+    if (reached_eof)
+      conn->inbuf_reached_eof = 1;
+
+    if (result < 0)
+      return -1;
+    n_read = (size_t) result;
+  }
+#endif /* _QUIC_SOCK_ */
+
 
   if (n_read > 0) {
      /* change *max_to_read */
@@ -3898,7 +3984,11 @@ connection_handle_write_impl(connection_t *conn, int force)
 
   /* Sometimes, "writable" means "connected". */
   if (connection_state_is_connecting(conn)) {
+#ifdef _QUIC_SOCK_
+    if (getsockopt(qs_get_fd(conn->s), SOL_SOCKET, SO_ERROR, (void*)&e, &len) < 0) {
+#else
     if (getsockopt(conn->s, SOL_SOCKET, SO_ERROR, (void*)&e, &len) < 0) {
+#endif
       log_warn(LD_BUG, "getsockopt() syscall failed");
       if (conn->type == CONN_TYPE_OR) {
         or_connection_t *orconn = TO_OR_CONN(conn);
@@ -3942,6 +4032,7 @@ connection_handle_write_impl(connection_t *conn, int force)
   max_to_write = force ? (ssize_t)conn->outbuf_flushlen
     : connection_bucket_write_limit(conn, now);
 
+#ifndef _QUIC_SOCK_
   if (connection_speaks_cells(conn) &&
       conn->state > OR_CONN_STATE_PROXY_HANDSHAKING) {
     or_connection_t *or_conn = TO_OR_CONN(conn);
@@ -4049,6 +4140,24 @@ connection_handle_write_impl(connection_t *conn, int force)
     }
     n_written = (size_t) result;
   }
+#else 
+  CONN_LOG_PROTECT(conn,
+           result = flush_buf(conn->s, conn->outbuf,
+                              max_to_write, &conn->outbuf_flushlen));
+  if (result < 0) {
+    if (CONN_IS_EDGE(conn))
+      connection_edge_end_errno(TO_EDGE_CONN(conn));
+    if (conn->type == CONN_TYPE_AP) {
+      /* writing failed; we couldn't send a SOCKS reply if we wanted to */
+      TO_ENTRY_CONN(conn)->socks_request->has_finished = 1;
+    }
+
+    connection_close_immediate(conn); /* Don't flush; connection is dead. */
+    connection_mark_for_close(conn);
+    return -1;
+  }
+  n_written = (size_t) result;
+#endif /* _QUIC_SOCK_ */
 
   if (n_written && conn->type == CONN_TYPE_AP) {
     edge_connection_t *edge_conn = TO_EDGE_CONN(conn);
@@ -4208,20 +4317,37 @@ connection_write_to_buf_impl_,(const char *string, size_t len,
     if (CONN_IS_EDGE(conn)) {
       /* if it failed, it means we have our package/delivery windows set
          wrong compared to our max outbuf size. close the whole circuit. */
+#ifdef _QUIC_SOCK_
+      log_warn(LD_NET,
+               "write_to_buf failed. Closing circuit (fd %lu).", qs_get_id(conn->s));
+#else
       log_warn(LD_NET,
                "write_to_buf failed. Closing circuit (fd %d).", (int)conn->s);
+#endif
       circuit_mark_for_close(circuit_get_by_edge_conn(TO_EDGE_CONN(conn)),
                              END_CIRC_REASON_INTERNAL);
     } else if (conn->type == CONN_TYPE_OR) {
       or_connection_t *orconn = TO_OR_CONN(conn);
+#ifdef _QUIC_SOCK_
+      log_warn(LD_NET,
+               "write_to_buf failed on an orconn; notifying of error "
+               "(fd %lu)", qs_get_id(conn->s));
+#else
       log_warn(LD_NET,
                "write_to_buf failed on an orconn; notifying of error "
                "(fd %d)", (int)(conn->s));
+#endif
       connection_or_close_for_error(orconn, 0);
     } else {
+#ifdef _QUIC_SOCK_
+      log_warn(LD_NET,
+               "write_to_buf failed. Closing connection (fd %lu).",
+               qs_get_id(conn->s));
+#else
       log_warn(LD_NET,
                "write_to_buf failed. Closing connection (fd %d).",
                (int)conn->s);
+#endif
       connection_mark_for_close(conn);
     }
     return;
@@ -4555,7 +4681,11 @@ client_check_address_changed(tor_socket_t sock)
   if (!outgoing_addrs)
     outgoing_addrs = smartlist_new();
 
+#ifdef _QUIC_SOCK_
+  if (getsockname(qs_get_fd(sock), (struct sockaddr*)&out_sockaddr, &out_addr_len)<0) {
+#else
   if (getsockname(sock, (struct sockaddr*)&out_sockaddr, &out_addr_len)<0) {
+#endif
     int e = tor_socket_errno(sock);
     log_warn(LD_NET, "getsockname() to check for address change failed: %s",
              tor_socket_strerror(e));
@@ -4621,12 +4751,20 @@ set_constrained_socket_buffers(tor_socket_t sock, int size)
 {
   void *sz = (void*)&size;
   socklen_t sz_sz = (socklen_t) sizeof(size);
+#ifdef _QUIC_SOCK_
+  if (setsockopt(qs_get_fd(sock), SOL_SOCKET, SO_SNDBUF, sz, sz_sz) < 0) {
+#else
   if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, sz, sz_sz) < 0) {
+#endif
     int e = tor_socket_errno(sock);
     log_warn(LD_NET, "setsockopt() to constrain send "
              "buffer to %d bytes failed: %s", size, tor_socket_strerror(e));
   }
+#ifdef _QUIC_SOCK_
+  if (setsockopt(qs_get_fd(sock), SOL_SOCKET, SO_RCVBUF, sz, sz_sz) < 0) {
+#else
   if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, sz, sz_sz) < 0) {
+#endif
     int e = tor_socket_errno(sock);
     log_warn(LD_NET, "setsockopt() to constrain recv "
              "buffer to %d bytes failed: %s", size, tor_socket_strerror(e));

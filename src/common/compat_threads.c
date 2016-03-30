@@ -120,7 +120,7 @@ send_ni(tor_socket_t fd, const void *buf, size_t n, int flags)
 {
   int r;
  again:
-  r = (int) tor_socket_send(fd, buf, n, flags);
+  r = (int) tor_socket_send(fd, (void *)buf, n, flags);
   if (r < 0 && ERRNO_IS_EINTR(tor_socket_errno(fd)))
     goto again;
   return r;

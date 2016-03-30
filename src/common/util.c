@@ -1925,9 +1925,9 @@ write_all(tor_socket_t fd, const char *buf, size_t count, int isSocket)
 
   while (written != count) {
     if (isSocket)
-      result = tor_socket_send(fd, buf+written, count-written, 0);
+      result = tor_socket_send(fd, ((char*)buf)+written, count-written, 0);
     else
-      result = write((int)fd, buf+written, count-written);
+      result = write((int)(uint64_t)fd, buf+written, count-written);
     if (result<0)
       return -1;
     written += result;
@@ -1955,7 +1955,7 @@ read_all(tor_socket_t fd, char *buf, size_t count, int isSocket)
     if (isSocket)
       result = tor_socket_recv(fd, buf+numread, count-numread, 0);
     else
-      result = read((int)fd, buf+numread, count-numread);
+      result = read((int)(uint64_t)fd, buf+numread, count-numread);
     if (result<0)
       return -1;
     else if (result == 0)
@@ -2416,7 +2416,8 @@ write_chunks_to_file_impl(const char *fname, const smartlist_t *chunks,
     return -1;
   SMARTLIST_FOREACH(chunks, sized_chunk_t *, chunk,
   {
-    result = write_all(fd, chunk->bytes, chunk->len, 0);
+    // HACK FIXME
+    result = write_all((tor_socket_t)(uint64_t)fd, chunk->bytes, chunk->len, 0);
     if (result < 0) {
       log_warn(LD_FS, "Error writing to \"%s\": %s", fname,
           strerror(errno));
@@ -2614,7 +2615,7 @@ read_file_to_str(const char *filename, int flags, struct stat *stat_out)
 
   string = tor_malloc((size_t)(statbuf.st_size+1));
 
-  r = read_all(fd,string,(size_t)statbuf.st_size,0);
+  r = read_all((tor_socket_t)(uint64_t)fd,string,(size_t)statbuf.st_size,0);
   if (r<0) {
     int save_errno = errno;
     log_warn(LD_FS,"Error reading from file \"%s\": %s", filename,

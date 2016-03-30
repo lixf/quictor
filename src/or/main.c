@@ -340,6 +340,19 @@ connection_add_impl(connection_t *conn, int is_connecting)
   (void) is_connecting;
 #endif
 
+#ifdef _QUIC_SOCK_
+  if (!HAS_BUFFEREVENT(conn) && (SOCKET_OK(conn->s) || conn->linked)) {
+    conn->read_event = tor_event_new(tor_libevent_get_base(),
+         qs_get_fd(conn->s), EV_READ|EV_PERSIST, conn_read_callback, conn);
+    conn->write_event = tor_event_new(tor_libevent_get_base(),
+         qs_get_fd(conn->s), EV_WRITE|EV_PERSIST, conn_write_callback, conn);
+    /* XXXX CHECK FOR NULL RETURN! */
+  }
+
+  log_debug(LD_NET,"new conn type %s, socket %lu, address %s, n_conns %d.",
+            conn_type_to_string(conn->type), qs_get_id(conn->s), conn->address,
+            smartlist_len(connection_array));
+#else
   if (!HAS_BUFFEREVENT(conn) && (SOCKET_OK(conn->s) || conn->linked)) {
     conn->read_event = tor_event_new(tor_libevent_get_base(),
          conn->s, EV_READ|EV_PERSIST, conn_read_callback, conn);
@@ -351,6 +364,7 @@ connection_add_impl(connection_t *conn, int is_connecting)
   log_debug(LD_NET,"new conn type %s, socket %d, address %s, n_conns %d.",
             conn_type_to_string(conn->type), (int)conn->s, conn->address,
             smartlist_len(connection_array));
+#endif
 
   return 0;
 }
@@ -361,12 +375,12 @@ connection_unregister_events(connection_t *conn)
 {
   if (conn->read_event) {
     if (event_del(conn->read_event))
-      log_warn(LD_BUG, "Error removing read event for %d", (int)conn->s);
+      log_warn(LD_BUG, "Error removing read event for %lu", qs_get_id(conn->s));
     tor_free(conn->read_event);
   }
   if (conn->write_event) {
     if (event_del(conn->write_event))
-      log_warn(LD_BUG, "Error removing write event for %d", (int)conn->s);
+      log_warn(LD_BUG, "Error removing write event for %lu", qs_get_id(conn->s));
     tor_free(conn->write_event);
   }
 #ifdef USE_BUFFEREVENTS
@@ -392,8 +406,8 @@ connection_remove(connection_t *conn)
 
   tor_assert(conn);
 
-  log_debug(LD_NET,"removing socket %d (type %s), n_conns now %d",
-            (int)conn->s, conn_type_to_string(conn->type),
+  log_debug(LD_NET,"removing socket %lu (type %s), n_conns now %d",
+            qs_get_id(conn->s), conn_type_to_string(conn->type),
             smartlist_len(connection_array));
 
   if (conn->type == CONN_TYPE_AP && conn->socket_family == AF_UNIX) {
@@ -587,9 +601,9 @@ connection_stop_reading,(connection_t *conn))
     connection_stop_reading_from_linked_conn(conn);
   } else {
     if (event_del(conn->read_event))
-      log_warn(LD_NET, "Error from libevent setting read event state for %d "
+      log_warn(LD_NET, "Error from libevent setting read event state for %lu "
                "to unwatched: %s",
-               (int)conn->s,
+               qs_get_id(conn->s),
                tor_socket_strerror(tor_socket_errno(conn->s)));
   }
 }
@@ -613,9 +627,9 @@ connection_start_reading,(connection_t *conn))
       connection_start_reading_from_linked_conn(conn);
   } else {
     if (event_add(conn->read_event, NULL))
-      log_warn(LD_NET, "Error from libevent setting read event state for %d "
+      log_warn(LD_NET, "Error from libevent setting read event state for %lu "
                "to watched: %s",
-               (int)conn->s,
+               qs_get_id(conn->s),
                tor_socket_strerror(tor_socket_errno(conn->s)));
   }
 }
@@ -653,9 +667,9 @@ connection_stop_writing,(connection_t *conn))
       connection_stop_reading_from_linked_conn(conn->linked_conn);
   } else {
     if (event_del(conn->write_event))
-      log_warn(LD_NET, "Error from libevent setting write event state for %d "
+      log_warn(LD_NET, "Error from libevent setting write event state for %lu "
                "to unwatched: %s",
-               (int)conn->s,
+               qs_get_id(conn->s),
                tor_socket_strerror(tor_socket_errno(conn->s)));
   }
 }
@@ -680,9 +694,9 @@ connection_start_writing,(connection_t *conn))
       connection_start_reading_from_linked_conn(conn->linked_conn);
   } else {
     if (event_add(conn->write_event, NULL))
-      log_warn(LD_NET, "Error from libevent setting write event state for %d "
+      log_warn(LD_NET, "Error from libevent setting write event state for %lu "
                "to watched: %s",
-               (int)conn->s,
+               qs_get_id(conn->s),
                tor_socket_strerror(tor_socket_errno(conn->s)));
   }
 }
@@ -774,7 +788,7 @@ conn_read_callback(evutil_socket_t fd, short event, void *_conn)
   (void)fd;
   (void)event;
 
-  log_debug(LD_NET,"socket %d wants to read.",(int)conn->s);
+  log_debug(LD_NET,"socket %lu wants to read.",qs_get_id(conn->s));
 
   /* assert_connection_ok(conn, time(NULL)); */
 
@@ -782,8 +796,8 @@ conn_read_callback(evutil_socket_t fd, short event, void *_conn)
     if (!conn->marked_for_close) {
 #ifndef _WIN32
       log_warn(LD_BUG,"Unhandled error on read for %s connection "
-               "(fd %d); removing",
-               conn_type_to_string(conn->type), (int)conn->s);
+               "(fd %lu); removing",
+               conn_type_to_string(conn->type), qs_get_id(conn->s));
       tor_fragile_assert();
 #endif
       if (CONN_IS_EDGE(conn))
@@ -806,8 +820,8 @@ conn_write_callback(evutil_socket_t fd, short events, void *_conn)
   (void)fd;
   (void)events;
 
-  LOG_FN_CONN(conn, (LOG_DEBUG, LD_NET, "socket %d wants to write.",
-                     (int)conn->s));
+  LOG_FN_CONN(conn, (LOG_DEBUG, LD_NET, "socket %lu wants to write.",
+                     qs_get_id(conn->s)));
 
   /* assert_connection_ok(conn, time(NULL)); */
 
@@ -815,8 +829,8 @@ conn_write_callback(evutil_socket_t fd, short events, void *_conn)
     if (!conn->marked_for_close) {
       /* this connection is broken. remove it. */
       log_fn(LOG_WARN,LD_BUG,
-             "unhandled error on write for %s connection (fd %d); removing",
-             conn_type_to_string(conn->type), (int)conn->s);
+             "unhandled error on write for %s connection (fd %lu); removing",
+             conn_type_to_string(conn->type), qs_get_id(conn->s));
       tor_fragile_assert();
       if (CONN_IS_EDGE(conn)) {
         /* otherwise we cry wolf about duplicate close */
@@ -872,8 +886,8 @@ conn_close_if_marked(int i)
   }
 #endif
 
-  log_debug(LD_NET,"Cleaning up connection (fd "TOR_SOCKET_T_FORMAT").",
-            conn->s);
+  log_debug(LD_NET,"Cleaning up connection (fd %lu).",
+            qs_get_id(conn->s));
 
   /* If the connection we are about to close was trying to connect to
   a proxy server and failed, the client won't be able to use that
@@ -889,10 +903,10 @@ conn_close_if_marked(int i)
     ssize_t sz = connection_bucket_write_limit(conn, now);
     if (!conn->hold_open_until_flushed)
       log_info(LD_NET,
-               "Conn (addr %s, fd %d, type %s, state %d) marked, but wants "
+               "Conn (addr %s, fd %lu, type %s, state %d) marked, but wants "
                "to flush %d bytes. (Marked at %s:%d)",
                escaped_safe_str_client(conn->address),
-               (int)conn->s, conn_type_to_string(conn->type), conn->state,
+               qs_get_id(conn->s), conn_type_to_string(conn->type), conn->state,
                (int)conn->outbuf_flushlen,
                 conn->marked_for_close_file, conn->marked_for_close);
     if (conn->linked_conn) {
@@ -922,8 +936,8 @@ conn_close_if_marked(int i)
         conn->hold_open_until_flushed && connection_wants_to_flush(conn)) {
       if (retval > 0) {
         LOG_FN_CONN(conn, (LOG_INFO,LD_NET,
-                           "Holding conn (fd %d) open for more flushing.",
-                           (int)conn->s));
+                           "Holding conn (fd %lu) open for more flushing.",
+                           qs_get_id(conn->s)));
         conn->timestamp_lastwritten = now; /* reset so we can flush more */
       } else if (sz == 0) {
         /* Also, retval==0.  If we get here, we didn't want to write anything
@@ -969,10 +983,10 @@ conn_close_if_marked(int i)
              "bytes to address %s.  If this happens a lot, either "
              "something is wrong with your network connection, or "
              "something is wrong with theirs. "
-             "(fd %d, type %s, state %d, marked at %s:%d).",
+             "(fd %lu, type %s, state %d, marked at %s:%d).",
              (int)connection_get_outbuf_len(conn),
              escaped_safe_str_client(conn->address),
-             (int)conn->s, conn_type_to_string(conn->type), conn->state,
+             qs_get_id(conn->s), conn_type_to_string(conn->type), conn->state,
              conn->marked_for_close_file,
              conn->marked_for_close);
     }
@@ -1104,8 +1118,8 @@ run_connection_housekeeping(int i, time_t now)
        (!DIR_CONN_IS_SERVER(conn) &&
         conn->timestamp_lastread
             + options->TestingDirConnectionMaxStall < now))) {
-    log_info(LD_DIR,"Expiring wedged directory conn (fd %d, purpose %d)",
-             (int)conn->s, conn->purpose);
+    log_info(LD_DIR,"Expiring wedged directory conn (fd %lu, purpose %d)",
+             qs_get_id(conn->s), conn->purpose);
     /* This check is temporary; it's to let us know whether we should consider
      * parsing partial serverdesc responses. */
     if (conn->purpose == DIR_PURPOSE_FETCH_SERVERDESC &&
@@ -1147,8 +1161,8 @@ run_connection_housekeeping(int i, time_t now)
     /* It's bad for new circuits, and has no unmarked circuits on it:
      * mark it now. */
     log_info(LD_OR,
-             "Expiring non-used OR connection to fd %d (%s:%d) [Too old].",
-             (int)conn->s, conn->address, conn->port);
+             "Expiring non-used OR connection to fd %lu (%s:%d) [Too old].",
+             qs_get_id(conn->s), conn->address, conn->port);
     if (conn->state == OR_CONN_STATE_CONNECTING)
       connection_or_connect_failed(TO_OR_CONN(conn),
                                    END_OR_CONN_REASON_TIMEOUT,
@@ -1157,24 +1171,24 @@ run_connection_housekeeping(int i, time_t now)
   } else if (!connection_state_is_open(conn)) {
     if (past_keepalive) {
       /* We never managed to actually get this connection open and happy. */
-      log_info(LD_OR,"Expiring non-open OR connection to fd %d (%s:%d).",
-               (int)conn->s,conn->address, conn->port);
+      log_info(LD_OR,"Expiring non-open OR connection to fd %lu (%s:%d).",
+               qs_get_id(conn->s),conn->address, conn->port);
       connection_or_close_normally(TO_OR_CONN(conn), 0);
     }
   } else if (we_are_hibernating() &&
              ! have_any_circuits &&
              !connection_get_outbuf_len(conn)) {
     /* We're hibernating, there's no circuits, and nothing to flush.*/
-    log_info(LD_OR,"Expiring non-used OR connection to fd %d (%s:%d) "
+    log_info(LD_OR,"Expiring non-used OR connection to fd %lu (%s:%d) "
              "[Hibernating or exiting].",
-             (int)conn->s,conn->address, conn->port);
+             qs_get_id(conn->s),conn->address, conn->port);
     connection_or_close_normally(TO_OR_CONN(conn), 1);
   } else if (!have_any_circuits &&
              now - or_conn->idle_timeout >=
                                          chan->timestamp_last_had_circuits) {
-    log_info(LD_OR,"Expiring non-used OR connection to fd %d (%s:%d) "
+    log_info(LD_OR,"Expiring non-used OR connection to fd %lu (%s:%d) "
              "[no circuits for %d; timeout %d; %scanonical].",
-             (int)conn->s, conn->address, conn->port,
+             qs_get_id(conn->s), conn->address, conn->port,
              (int)(now - chan->timestamp_last_had_circuits),
              or_conn->idle_timeout,
              or_conn->is_canonical ? "" : "non");
@@ -1183,9 +1197,9 @@ run_connection_housekeeping(int i, time_t now)
       now >= or_conn->timestamp_lastempty + options->KeepalivePeriod*10 &&
       now >= conn->timestamp_lastwritten + options->KeepalivePeriod*10) {
     log_fn(LOG_PROTOCOL_WARN,LD_PROTOCOL,
-           "Expiring stuck OR connection to fd %d (%s:%d). (%d bytes to "
+           "Expiring stuck OR connection to fd %lu (%s:%d). (%d bytes to "
            "flush; %d seconds since last write)",
-           (int)conn->s, conn->address, conn->port,
+           qs_get_id(conn->s), conn->address, conn->port,
            (int)connection_get_outbuf_len(conn),
            (int)(now-conn->timestamp_lastwritten));
     connection_or_close_normally(TO_OR_CONN(conn), 0);
@@ -2692,8 +2706,8 @@ dumpstats(int severity)
   SMARTLIST_FOREACH_BEGIN(connection_array, connection_t *, conn) {
     int i = conn_sl_idx;
     tor_log(severity, LD_GENERAL,
-        "Conn %d (socket %d) type %d (%s), state %d (%s), created %d secs ago",
-        i, (int)conn->s, conn->type, conn_type_to_string(conn->type),
+        "Conn %d (socket %lu) type %d (%s), state %d (%s), created %d secs ago",
+        i, qs_get_id(conn->s), conn->type, conn_type_to_string(conn->type),
         conn->state, conn_state_to_string(conn->type, conn->state),
         (int)(now - conn->timestamp_created));
     if (!connection_is_listener(conn)) {

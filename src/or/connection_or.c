@@ -1347,6 +1347,12 @@ connection_or_close_for_error,(or_connection_t *orconn, int flush))
 MOCK_IMPL(int,
 connection_tls_start_handshake,(or_connection_t *conn, int receiving))
 {
+
+#ifdef _QUIC_SOCK_
+  (void) conn;
+  (void) receiving;
+  return -1; 
+#else
   channel_listener_t *chan_listener;
   channel_t *chan;
 
@@ -1409,6 +1415,7 @@ connection_tls_start_handshake,(or_connection_t *conn, int receiving))
       return -1;
   }
   return 0;
+#endif
 }
 
 /** Block all future attempts to renegotiate on 'conn' */

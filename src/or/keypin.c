@@ -287,7 +287,7 @@ keypin_open_journal(const char *fname)
   char tbuf[ISO_TIME_LEN+1];
   format_iso_time(tbuf, approx_time());
   tor_snprintf(buf, sizeof(buf), "@opened-at %s\n", tbuf);
-  if (write_all(fd, buf, strlen(buf), 0) < 0)
+  if (write_all((tor_socket_t)(int64_t)fd, buf, strlen(buf), 0) < 0)
     goto err;
 
   keypin_journal_fd = fd;
@@ -326,7 +326,7 @@ keypin_journal_append_entry(const uint8_t *rsa_id_digest,
                       (const char*)ed25519_id_key);
   line[BASE64_DIGEST_LEN+1+BASE64_DIGEST256_LEN] = '\n';
 
-  if (write_all(keypin_journal_fd, line, JOURNAL_LINE_LEN, 0)<0) {
+  if (write_all((tor_socket_t)(int64_t)keypin_journal_fd, line, JOURNAL_LINE_LEN, 0)<0) {
     log_warn(LD_DIRSERV, "Error while adding a line to the key-pinning "
              "journal: %s", strerror(errno));
     keypin_close_journal();

@@ -372,7 +372,7 @@ dnsserv_configure_listener(connection_t *conn)
 
   listener_conn = TO_LISTENER_CONN(conn);
   listener_conn->dns_server_port =
-    tor_evdns_add_server_port(conn->s, 0, evdns_server_callback,
+    tor_evdns_add_server_port(qs_get_fd(conn->s), 0, evdns_server_callback,
                               listener_conn);
 }
 

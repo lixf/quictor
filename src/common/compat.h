@@ -444,7 +444,7 @@ typedef int socklen_t;
 /* Redefine socket type for QUIC usage */
 #ifdef _QUIC_SOCK_
 #define tor_socket_t quicsock_t
-#define TOR_SOCKET_T_FORMAT "%d"
+#define TOR_SOCKET_T_FORMAT "%p"
 #define SOCKET_OK(s) ((s) != NULL)
 #define TOR_INVALID_SOCKET NULL
 

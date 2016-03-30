@@ -474,7 +474,7 @@ read_to_chunk(buf_t *buf, chunk_t *chunk, tor_socket_t fd, size_t at_most,
     return 0; /* would block. */
   } else if (read_result == 0) {
 #ifdef _QUIC_SOCK_
-    log_debug(LD_NET,"Encountered eof on fd %d", qs_get_id(fd));
+    log_debug(LD_NET,"Encountered eof on fd %lu", qs_get_id(fd));
 #else
     log_debug(LD_NET,"Encountered eof on fd %d", (int)fd);
 #endif
