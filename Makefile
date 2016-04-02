@@ -159,6 +159,9 @@ am__append_9 = \
 
 #am__append_10 = src/tools/tor-cov-resolve src/tools/tor-cov-gencert
 subdir = .
+################### LIBQUIC MOD ########################
+LIBQUIC = -Lsrc/simple-quic -lquicsock
+########################################################
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_sign.m4 \
 	$(top_srcdir)/m4/pc_from_ucontext.m4 $(top_srcdir)/m4/pkg.m4 \
@@ -1590,7 +1593,7 @@ src_or_tor_LDFLAGS =
 src_or_tor_LDADD = src/or/libtor.a src/common/libor.a \
 	src/common/libor-crypto.a $(LIBKECCAK_TINY) $(LIBDONNA) \
 	src/common/libor-event.a src/trunnel/libor-trunnel.a \
-	-lz -lm -levent -lssl -lcrypto -Lsrc/simple-quic -lquicsock \
+	-lz -lm -levent -lssl -lcrypto $(LIBQUIC) \
 	   
 
 #src_or_tor_cov_SOURCES = src/or/tor_main.c
@@ -1793,7 +1796,8 @@ src_test_test_switch_id_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
 src_test_test_switch_id_LDFLAGS = 
 src_test_test_switch_id_LDADD = \
 	src/common/libor-testing.a \
-	-lz -lm
+	-lz -lm \
+	$(LIBQUIC) 	\
 
 src_test_test_LDFLAGS =   \
         
@@ -1804,6 +1808,7 @@ src_test_test_LDADD = src/or/libtor-testing.a src/common/libor-testing.a \
 	src/trunnel/libor-trunnel-testing.a \
 	-lz -lm -levent \
 	-lssl -lcrypto    \
+	$(LIBQUIC) 	\
 	
 
 src_test_test_slow_CPPFLAGS = $(src_test_test_CPPFLAGS)
@@ -1822,6 +1827,7 @@ src_test_bench_LDADD = src/or/libtor.a src/common/libor.a \
 	src/common/libor-event.a src/trunnel/libor-trunnel.a \
 	-lz -lm -levent \
 	-lssl -lcrypto    \
+	$(LIBQUIC) 	\
 	
 
 src_test_test_workqueue_LDFLAGS =   \
@@ -1832,14 +1838,17 @@ src_test_test_workqueue_LDADD = src/or/libtor-testing.a \
 	src/common/libor-crypto-testing.a $(LIBKECCAK_TINY) $(LIBDONNA) \
 	src/common/libor-event-testing.a \
 	-lz -lm -levent \
-	-lssl -lcrypto   
+	-lssl -lcrypto   \
+	$(LIBQUIC) 	\
 
 src_test_test_ntor_cl_SOURCES = src/test/test_ntor_cl.c
 src_test_test_ntor_cl_LDFLAGS =  
 src_test_test_ntor_cl_LDADD = src/or/libtor.a src/common/libor.a \
 	src/common/libor-crypto.a $(LIBKECCAK_TINY) $(LIBDONNA) \
 	-lz -lm \
-	-lssl -lcrypto   
+	-lssl -lcrypto  \
+	$(LIBQUIC) 	\
+
 
 src_test_test_ntor_cl_AM_CPPFLAGS = \
 	-I"$(top_srcdir)/src/or"
@@ -1847,13 +1856,15 @@ src_test_test_ntor_cl_AM_CPPFLAGS = \
 src_test_test_bt_cl_SOURCES = src/test/test_bt_cl.c
 src_test_test_bt_cl_LDADD = src/common/libor-testing.a \
 	-lm \
+	$(LIBQUIC) 	\
 	 
+
 
 src_test_test_bt_cl_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
 src_test_test_bt_cl_CPPFLAGS = $(src_test_AM_CPPFLAGS) $(TEST_CPPFLAGS)
 src_tools_tor_resolve_SOURCES = src/tools/tor-resolve.c
 src_tools_tor_resolve_LDFLAGS = 
-src_tools_tor_resolve_LDADD = src/common/libor.a -lm 
+src_tools_tor_resolve_LDADD = src/common/libor.a -lm $(LIBQUIC)
 #src_tools_tor_cov_resolve_SOURCES = src/tools/tor-resolve.c
 #src_tools_tor_cov_resolve_CPPFLAGS = $(AM_CPPFLAGS) $(TEST_CPPFLAGS)
 #src_tools_tor_cov_resolve_CFLAGS = $(AM_CFLAGS) $(TEST_CFLAGS)
@@ -1865,6 +1876,7 @@ src_tools_tor_gencert_LDFLAGS =
 src_tools_tor_gencert_LDADD = src/common/libor.a src/common/libor-crypto.a \
     $(LIBKECCAK_TINY) \
     $(LIBDONNA) \
+	$(LIBQUIC) \
         -lm -lz -lssl -lcrypto \
           
 
@@ -1885,6 +1897,7 @@ src_tools_tor_checkkey_LDADD = src/common/libor.a src/common/libor-crypto.a \
     $(LIBKECCAK_TINY) \
     $(LIBDONNA) \
         -lm -lz -lssl -lcrypto \
+	$(LIBQUIC) 	\
           
 
 confdir = $(sysconfdir)/tor

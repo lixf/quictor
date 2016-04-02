@@ -1243,7 +1243,7 @@ tor_open_socket_with_extensions(int domain, int type, int protocol,
 #if defined(_QUIC_SOCK_)
   // should check number of sockets open
 
-  s = qs_open();
+  s = qs_open(NULL);
   if (!SOCKET_OK(s))
     return s;
 

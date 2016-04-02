@@ -96,7 +96,7 @@ load_passphrase(void)
 {
   char *cp;
   char buf[1024]; /* "Ought to be enough for anybody." */
-  ssize_t n = read_all(passphrase_fd, buf, sizeof(buf), 0);
+  ssize_t n = read_all((tor_socket_t)(uint64_t)passphrase_fd, buf, sizeof(buf), 0);
   if (n < 0) {
     log_err(LD_GENERAL, "Couldn't read from passphrase fd: %s",
             strerror(errno));
