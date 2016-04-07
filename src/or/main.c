@@ -341,11 +341,22 @@ connection_add_impl(connection_t *conn, int is_connecting)
 #endif
 
 #ifdef _QUIC_SOCK_
+  // Do the handshakes with QUIC
+  int fd = qs_get_fd(conn->s);
+  
+  tor_assert(tor_libevent_get_base() != NULL);
+  tor_assert(conn->s != NULL);
+  tor_assert(fd != 0);
+
+  quicsock_alarm_handler_t alarm = qs_get_alarm_handler(conn->s); 
+  tor_assert(alarm != NULL);
+  qs_util_set_libevent_alarm_handler_base(alarm, tor_libevent_get_base());
+
   if (!HAS_BUFFEREVENT(conn) && (SOCKET_OK(conn->s) || conn->linked)) {
     conn->read_event = tor_event_new(tor_libevent_get_base(),
-         qs_get_fd(conn->s), EV_READ|EV_PERSIST, conn_read_callback, conn);
+         fd, EV_READ|EV_PERSIST, conn_read_callback, conn);
     conn->write_event = tor_event_new(tor_libevent_get_base(),
-         qs_get_fd(conn->s), EV_WRITE|EV_PERSIST, conn_write_callback, conn);
+         fd, EV_WRITE|EV_PERSIST, conn_write_callback, conn);
     /* XXXX CHECK FOR NULL RETURN! */
   }
 
@@ -3544,6 +3555,12 @@ int
 tor_main(int argc, char *argv[])
 {
   int result = 0;
+
+#ifdef _QUIC_SOCK_
+  {
+    qs_init("./leaf_cert.pem", "./leaf_cert.key");
+  }
+#endif
 
 #ifdef _WIN32
   /* Call SetProcessDEPPolicy to permanently enable DEP.

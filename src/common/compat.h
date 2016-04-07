@@ -65,7 +65,8 @@
 #define _QUIC_SOCK_
 
 #ifdef _QUIC_SOCK_
-#include "../simple-quic/quicsock/quicsock.h"
+#include "quicsock/quicsock.h"
+#include "quicsock_util/libevent_plugin.h"
 #endif /* _QUIC_SOCK_ */
 
 /* ===== Compiler compatibility */
@@ -441,14 +442,11 @@ typedef int socklen_t;
 
 #else
 
-/* Redefine socket type for QUIC usage */
-#ifdef _QUIC_SOCK_
-#define tor_socket_t quicsock_t
-#define TOR_SOCKET_T_FORMAT "%p"
-#define SOCKET_OK(s) ((s) != NULL)
-#define TOR_INVALID_SOCKET NULL
-
-#else
+// Assume libquic is always compiled in; might want to change later
+#define tor_quicsock_t quicsock_t
+#define TOR_QUICSOCK_T_FORMAT "%p"
+#define QUICSOCK_OK(s) ((s) != NULL)
+#define TOR_INVALID_QUICSOCK NULL
 
 /** Type used for a network socket. */
 #define tor_socket_t int
@@ -457,7 +455,6 @@ typedef int socklen_t;
 #define SOCKET_OK(s) ((s) >= 0)
 /** Error/uninitialized value for a tor_socket_t. */
 #define TOR_INVALID_SOCKET (-1)
-#endif /* _QUIC_SOCK_ */
 
 #endif /* _WIN32 */
 
