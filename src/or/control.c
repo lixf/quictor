@@ -1520,14 +1520,9 @@ handle_control_takeownership(control_connection_t *conn, uint32_t len,
 
   conn->is_owning_control_connection = 1;
 
-#ifdef _QUIC_SOCK_
-  log_info(LD_CONTROL, "Control connection %lu has taken ownership of this "
-           "Tor instance.", qs_get_id(conn->base_.s));
-#else
   log_info(LD_CONTROL, "Control connection %d has taken ownership of this "
            "Tor instance.",
            (int)(conn->base_.s));
-#endif
 
   send_control_done(conn);
   return 0;
@@ -1833,11 +1828,7 @@ getinfo_helper_listeners(control_connection_t *control_conn,
     if (conn->type != type || conn->marked_for_close || !SOCKET_OK(conn->s))
       continue;
 
-#ifdef _QUIC_SOCK_
-    if (getsockname(qs_get_fd(conn->s), (struct sockaddr *)&ss, &ss_len) < 0) {
-#else
     if (getsockname(conn->s, (struct sockaddr *)&ss, &ss_len) < 0) {
-#endif
       smartlist_add_asprintf(res, "%s:%d", conn->address, (int)conn->port);
     } else {
       char *tmp = tor_sockaddr_to_str((struct sockaddr *)&ss);

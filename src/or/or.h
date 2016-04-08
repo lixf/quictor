@@ -22,6 +22,12 @@
 #endif
 #endif
 
+/* DISABLE BUFFEREVENT FOR NOW */
+#ifdef USE_BUFFEREVENT
+#undef USE_BUFFEREVENT
+#endif
+/*******************************/
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -1323,6 +1329,12 @@ typedef struct connection_t {
   /** Bytes written since last call to control_event_conn_bandwidth_used().
    * Only used if we're configured to emit CONN_BW events. */
   uint32_t n_written_conn_bw;
+
+  /** For QUIC SOCK usage */
+  tor_quicsock_t q_sock;
+  
+  unsigned int use_quic:1; /**< Boolean: do we use quic socket */
+
 } connection_t;
 
 /** Subtype of connection_t; used for a listener socket. */

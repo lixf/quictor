@@ -486,15 +486,8 @@ MOCK_DECL(int,
 tor_getsockname,(tor_socket_t socket, struct sockaddr *address,
                  socklen_t *address_len));
 
-#ifdef _QUIC_SOCK_
-#define tor_socket_send(s, buf, len, flags) qs_send(s, buf, len)
-#define tor_socket_recv(s, buf, len, flags) qs_recv(s, buf, len)
-
-#else 
-
 #define tor_socket_send(s, buf, len, flags) send(s, buf, len, flags)
 #define tor_socket_recv(s, buf, len, flags) recv(s, buf, len, flags)
-#endif
 
 /** Implementation of struct in6_addr for platforms that do not have it.
  * Generally, these platforms are ones without IPv6 support, but we want to

@@ -1815,24 +1815,14 @@ destination_from_socket(entry_connection_t *conn, socks_request_t *req)
   switch (ENTRY_TO_CONN(conn)->socket_family) {
 #ifdef TRANS_NETFILTER_IPV4
     case AF_INET:
-#ifdef _QUIC_SOCK_
-      rv = getsockopt(qs_get_fd(ENTRY_TO_CONN(conn)->s), SOL_IP, SO_ORIGINAL_DST,
-                  (struct sockaddr*)&orig_dst, &orig_dst_len);
-#else
       rv = getsockopt(ENTRY_TO_CONN(conn)->s, SOL_IP, SO_ORIGINAL_DST,
                   (struct sockaddr*)&orig_dst, &orig_dst_len);
-#endif
       break;
 #endif
 #ifdef TRANS_NETFILTER_IPV6
     case AF_INET6:
-#ifdef _QUIC_SOCK_
-      rv = getsockopt(qs_get_fd(ENTRY_TO_CONN(conn)->s), SOL_IPV6, IP6T_SO_ORIGINAL_DST,
-                  (struct sockaddr*)&orig_dst, &orig_dst_len);
-#else
       rv = getsockopt(ENTRY_TO_CONN(conn)->s, SOL_IPV6, IP6T_SO_ORIGINAL_DST,
                   (struct sockaddr*)&orig_dst, &orig_dst_len);
-#endif
       break;
 #endif
     default:

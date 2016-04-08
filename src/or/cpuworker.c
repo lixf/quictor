@@ -81,20 +81,11 @@ cpu_init(void)
     replyqueue = replyqueue_new(0);
   }
   if (!reply_event) {
-#ifdef _QUIC_SOCK_
-    reply_event = tor_event_new(tor_libevent_get_base(),
-                                qs_get_fd(replyqueue_get_socket(replyqueue)),
-                                EV_READ|EV_PERSIST,
-                                replyqueue_process_cb,
-                                replyqueue);
-#else
     reply_event = tor_event_new(tor_libevent_get_base(),
                                 replyqueue_get_socket(replyqueue),
                                 EV_READ|EV_PERSIST,
                                 replyqueue_process_cb,
                                 replyqueue);
-#endif
-
     event_add(reply_event, NULL);
   }
   if (!threadpool) {

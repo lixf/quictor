@@ -192,7 +192,7 @@ do_resolve(const char *hostname, uint32_t sockshost, uint16_t socksport,
            int reverse, int version,
            tor_addr_t *result_addr, char **result_hostname)
 {
-  tor_socket_t s = TOR_INVALID_SOCKET;
+  int s = -1;
   struct sockaddr_in socksaddr;
   char *req = NULL;
   ssize_t len = 0;
@@ -205,7 +205,7 @@ do_resolve(const char *hostname, uint32_t sockshost, uint16_t socksport,
   *result_hostname = NULL;
 
   s = tor_open_socket(PF_INET,SOCK_STREAM,IPPROTO_TCP);
-  if (!SOCKET_OK(s)) {
+  if (s<0) {
     log_sock_error("creating_socket", -1);
     return -1;
   }
@@ -214,7 +214,7 @@ do_resolve(const char *hostname, uint32_t sockshost, uint16_t socksport,
   socksaddr.sin_family = AF_INET;
   socksaddr.sin_port = htons(socksport);
   socksaddr.sin_addr.s_addr = htonl(sockshost);
-  if (qs_connect(s, (struct sockaddr*)&socksaddr)) {
+  if (connect(s, (struct sockaddr*)&socksaddr, sizeof(socksaddr))) {
     log_sock_error("connecting to SOCKS host", s);
     goto err;
   }
