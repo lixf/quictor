@@ -348,9 +348,9 @@ connection_add_impl(connection_t *conn, int is_connecting)
     tor_assert(tor_libevent_get_base() != NULL);
     tor_assert(conn->q_sock != NULL);
 
-    quicsock_alarm_handler_t alarm = qs_get_alarm_handler(conn->q_sock); 
+    quicsock_event_handler_t alarm = qs_get_event_handler(conn->q_sock); 
     tor_assert(alarm != NULL);
-    qs_util_set_libevent_alarm_handler_base(alarm, tor_libevent_get_base());
+    qs_util_set_libevent_handler_base(alarm, tor_libevent_get_base());
 
     if (QUICSOCK_OK(conn->q_sock) || conn->linked) {
       conn->read_event = tor_event_new(tor_libevent_get_base(),

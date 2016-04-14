@@ -113,6 +113,17 @@ static smartlist_t *outgoing_addrs = NULL;
     case CONN_TYPE_AP_NATD_LISTENER: \
     case CONN_TYPE_AP_DNS_LISTENER
 
+#define CASE_NOQUIC_LISTENER_TYPE \
+    case CONN_TYPE_DIR_LISTENER: \
+    case CONN_TYPE_CONTROL_LISTENER: \
+    case CONN_TYPE_AP_TRANS_LISTENER: \
+    case CONN_TYPE_AP_NATD_LISTENER: \
+    case CONN_TYPE_AP_DNS_LISTENER
+
+#define CASE_QUIC_LISTENER_TYPE \
+    case CONN_TYPE_OR_LISTENER: \
+    case CONN_TYPE_EXT_OR_LISTENER: \
+    case CONN_TYPE_AP_LISTENER
 /**************************************************************/
 
 /**
@@ -397,7 +408,7 @@ connection_init(time_t now, connection_t *conn, int type, int socket_family)
     case CONN_TYPE_EXT_OR:
       conn->magic = OR_CONNECTION_MAGIC;
       conn->use_quic = 1; 
-      conn->q_sock = qs_open(qs_util_get_libevent_alarm_handler()); 
+      conn->q_sock = qs_open(qs_util_get_libevent_handler()); 
       break;
     case CONN_TYPE_EXIT:
       conn->magic = EDGE_CONNECTION_MAGIC;
@@ -411,10 +422,13 @@ connection_init(time_t now, connection_t *conn, int type, int socket_family)
     case CONN_TYPE_CONTROL:
       conn->magic = CONTROL_CONNECTION_MAGIC;
       break;
-    CASE_ANY_LISTENER_TYPE:
+    CASE_QUIC_LISTENER_TYPE:
       conn->magic = LISTENER_CONNECTION_MAGIC;
       conn->use_quic = 1; 
-      conn->q_sock = qs_open(qs_util_get_libevent_alarm_handler()); 
+      conn->q_sock = qs_open(qs_util_get_libevent_handler()); 
+      break;
+    CASE_NOQUIC_LISTENER_TYPE:
+      conn->magic = LISTENER_CONNECTION_MAGIC;
       break;
     default:
       conn->magic = BASE_CONNECTION_MAGIC;
@@ -1440,7 +1454,7 @@ connection_handle_listener_read_quic(connection_t *conn, int new_type)
   tor_assert((size_t)remotelen >= sizeof(struct sockaddr_in));
   memset(&addrbuf, 0, sizeof(addrbuf));
 
-  q_news = qs_accept(conn->q_sock, remote);
+  q_news = qs_accept(conn->q_sock, remote, &remotelen);
   if (!SOCKET_OK(q_news)) { /* accept() error */
     log_warn(LD_NET,"accept() failed. Closing listener.");
     connection_mark_for_close(conn);
@@ -1865,9 +1879,9 @@ connection_connect_sockaddr_quic(connection_t *conn,
 
   s = conn->q_sock;
   // handle the alarm needed for QUIC since we are going to use this socket
-  quicsock_alarm_handler_t alarm = qs_get_alarm_handler(s); 
-  tor_assert(alarm != NULL);
-  qs_util_set_libevent_alarm_handler_base(alarm, tor_libevent_get_base());
+  quicsock_event_handler_t e_handler = qs_get_event_handler(s); 
+  tor_assert(e_handler != NULL);
+  qs_util_set_libevent_handler_base(e_handler, tor_libevent_get_base());
 
   if (! SOCKET_OK(s)) {
     /*
@@ -1889,7 +1903,7 @@ connection_connect_sockaddr_quic(connection_t *conn,
   }
   */
 
-  if (bindaddr && qs_bind(s, bindaddr) < 0) {
+  if (bindaddr && qs_bind(s, bindaddr, bindaddr_len) < 0) {
     log_warn(LD_NET,"Error binding network socket");
     qs_close(s);
     conn->q_sock = NULL; 
@@ -1902,7 +1916,7 @@ connection_connect_sockaddr_quic(connection_t *conn,
     set_constrained_socket_buffers(s, (int)options->ConstrainedSockSize);
   */
   
-  if (qs_connect(s, sa) < 0) {
+  if (qs_connect(s, sa, sa_len) < 0) {
     /*
     int e = tor_socket_errno(s);
     if (!ERRNO_IS_CONN_EINPROGRESS(e)) {
@@ -1994,6 +2008,8 @@ connection_connect(connection_t *conn, const char *address,
 
   log_debug(LD_NET, "Connecting to %s:%u.",
             escaped_safe_str_client(address), port);
+  log_debug(LD_NET, "conn: use_quic %d, type %d, purpose %d", conn->use_quic, 
+            conn->type, conn->purpose);
 
   
   
