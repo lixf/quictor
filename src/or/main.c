@@ -360,7 +360,7 @@ connection_add_impl(connection_t *conn, int is_connecting)
       /* XXXX CHECK FOR NULL RETURN! */
     }
 
-    log_debug(LD_NET,"new conn type %s, socket %lu, address %s, n_conns %d.",
+    log_debug(LD_NET,"Adding QUIC conn: new conn type %s, socket %lu, address %s, n_conns %d.",
               conn_type_to_string(conn->type), qs_get_id(conn->q_sock), conn->address,
               smartlist_len(connection_array));
   } else {

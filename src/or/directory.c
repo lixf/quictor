@@ -998,7 +998,7 @@ directory_initiate_command_rend(const tor_addr_t *_addr,
   if (rend_query)
     conn->rend_data = rend_data_dup(rend_query);
 
-  if (!anonymized_connection && !use_begindir) {
+  if (!anonymized_connection) {
     /* then we want to connect to dirport directly */
 
     if (options->HTTPProxy) {

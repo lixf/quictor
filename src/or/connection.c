@@ -118,12 +118,12 @@ static smartlist_t *outgoing_addrs = NULL;
     case CONN_TYPE_CONTROL_LISTENER: \
     case CONN_TYPE_AP_TRANS_LISTENER: \
     case CONN_TYPE_AP_NATD_LISTENER: \
-    case CONN_TYPE_AP_DNS_LISTENER
+    case CONN_TYPE_AP_DNS_LISTENER: \
+    case CONN_TYPE_AP_LISTENER
 
 #define CASE_QUIC_LISTENER_TYPE \
     case CONN_TYPE_OR_LISTENER: \
-    case CONN_TYPE_EXT_OR_LISTENER: \
-    case CONN_TYPE_AP_LISTENER
+    case CONN_TYPE_EXT_OR_LISTENER
 /**************************************************************/
 
 /**
