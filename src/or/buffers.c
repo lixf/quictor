@@ -515,7 +515,11 @@ read_to_chunk_quic(buf_t *buf, chunk_t *chunk, tor_quicsock_t fd, size_t at_most
 
   read_result = qs_recv(fd, CHUNK_WRITE_PTR(chunk), at_most);
 
-  if (read_result < 0) {
+  if (read_result == -2) {
+    // nothing more to read; not EOF though
+    return 0;
+  } else if (read_result == -1) {
+    // problem
     return -1;
   } else if (read_result == 0) {
     log_debug(LD_NET,"Encountered eof on fd %d", qs_get_fd(fd));

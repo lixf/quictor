@@ -680,7 +680,7 @@ connection_or_finished_connecting(or_connection_t *or_conn)
   
   if (connection_tls_start_handshake(or_conn, 0) < 0) {
     if (conn->use_quic) {
-      log_debug(LD_NET, "tls failed while using TOR, that is ok"); 
+      log_debug(LD_NET, "tls failed while using QUIC, that is ok"); 
       return 0;
     }
     /* TLS handshaking error of some kind. */

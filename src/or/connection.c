@@ -1698,8 +1698,7 @@ connection_handle_listener_read_quic(connection_t *conn, int new_type)
             "Connection accepted on socket %d (child of fd %d).",
             (int)qs_get_fd(q_news),(int)qs_get_fd(conn->q_sock));
 
-  if (conn->socket_family == AF_INET || conn->socket_family == AF_INET6 ||
-     (conn->socket_family == AF_UNIX && new_type == CONN_TYPE_AP)) {
+  if (conn->socket_family == AF_INET || conn->socket_family == AF_INET6) {
     tor_addr_t addr;
     uint16_t port;
     if (check_sockaddr(remote, remotelen, LOG_INFO)<0) {
@@ -1711,27 +1710,6 @@ connection_handle_listener_read_quic(connection_t *conn, int new_type)
 
     tor_addr_from_sockaddr(&addr, remote, &port);
 
-    /* process entrance policies here, before we even create the connection */
-    if (new_type == CONN_TYPE_AP) {
-      /* check sockspolicy to see if we should accept it */
-      if (socks_policy_permits_address(&addr) == 0) {
-        log_notice(LD_APP,
-                   "Denying socks connection from untrusted address %s.",
-                   fmt_and_decorate_addr(&addr));
-        qs_close(q_news);
-        return 0;
-      }
-    }
-    if (new_type == CONN_TYPE_DIR) {
-      /* check dirpolicy to see if we should accept it */
-      if (dir_policy_permits_address(&addr) == 0) {
-        log_notice(LD_DIRSERV,"Denying dir connection from address %s.",
-                   fmt_and_decorate_addr(&addr));
-        qs_close(q_news);
-        return 0;
-      }
-    }
-
     newconn = connection_new(new_type, conn->socket_family);
     newconn->q_sock = q_news;
 
@@ -1740,32 +1718,6 @@ connection_handle_listener_read_quic(connection_t *conn, int new_type)
     newconn->port = port;
     newconn->address = tor_dup_addr(&addr);
 
-    if (new_type == CONN_TYPE_AP && conn->socket_family != AF_UNIX) {
-      log_info(LD_NET, "New SOCKS connection opened from %s.",
-               fmt_and_decorate_addr(&addr));
-    }
-    if (new_type == CONN_TYPE_AP && conn->socket_family == AF_UNIX) {
-      newconn->port = 0;
-      newconn->address = tor_strdup(conn->address);
-      log_info(LD_NET, "New SOCKS AF_UNIX connection opened");
-    }
-    if (new_type == CONN_TYPE_CONTROL) {
-      log_notice(LD_CONTROL, "New control connection opened from %s.",
-                 fmt_and_decorate_addr(&addr));
-    }
-
-  } else if (conn->socket_family == AF_UNIX && conn->type != CONN_TYPE_AP) {
-    tor_assert(conn->type == CONN_TYPE_CONTROL_LISTENER);
-    tor_assert(new_type == CONN_TYPE_CONTROL);
-    log_notice(LD_CONTROL, "New control connection opened.");
-
-    newconn = connection_new(new_type, conn->socket_family);
-    newconn->q_sock = q_news;
-
-    /* remember the remote address -- do we have anything sane to put here? */
-    tor_addr_make_unspec(&newconn->addr);
-    newconn->port = 1;
-    newconn->address = tor_strdup(conn->address);
   } else {
     tor_assert(0);
   };
@@ -1950,7 +1902,6 @@ connection_init_accepted_conn(connection_t *conn,
       or_conn = TO_OR_CONN(conn);
       
       control_event_or_conn_status(or_conn, OR_CONN_EVENT_NEW, 0);
-      connection_or_set_state_open(or_conn);
       
       //rv = connection_tls_start_handshake(TO_OR_CONN(conn), 1);
       //if (rv < 0) {
@@ -1966,6 +1917,10 @@ connection_init_accepted_conn(connection_t *conn,
       }
       chan = channel_tls_handle_incoming(or_conn);
       channel_listener_queue_incoming(chan_listener, chan);
+      
+      tor_assert(or_conn->chan);
+      connection_or_set_state_open(or_conn);
+      
       return 0;
       
       break;
@@ -3909,8 +3864,7 @@ connection_handle_read_impl(connection_t *conn)
       connection_stop_reading_from_linked_conn(conn);
   }
   /* If we hit the EOF, call connection_reached_eof(). */
-  if (!conn->marked_for_close &&
-      conn->inbuf_reached_eof) {
+  if (!conn->marked_for_close && conn->inbuf_reached_eof) {
     log_notice(LD_NET, "WARNING! EOF");
   }
   if (!conn->marked_for_close &&
