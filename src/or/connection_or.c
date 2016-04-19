@@ -677,8 +677,12 @@ connection_or_finished_connecting(or_connection_t *or_conn)
     connection_or_change_state(or_conn, OR_CONN_STATE_PROXY_HANDSHAKING);
     return 0;
   }
-
+  
   if (connection_tls_start_handshake(or_conn, 0) < 0) {
+    if (conn->use_quic) {
+      log_debug(LD_NET, "tls failed while using TOR, that is ok"); 
+      return 0;
+    }
     /* TLS handshaking error of some kind. */
     connection_or_close_for_error(or_conn, 0);
     return -1;
@@ -1273,6 +1277,7 @@ connection_or_connect, (const tor_addr_t *_addr, uint16_t port,
       connection_watch_events(TO_CONN(conn), READ_EVENT | WRITE_EVENT);
       /* writable indicates finish, readable indicates broken link,
          error indicates broken link on windows */
+      connection_or_change_state(conn, OR_CONN_STATE_OPEN);
       return conn;
     /* case 1: fall through */
   }
@@ -1348,11 +1353,6 @@ MOCK_IMPL(int,
 connection_tls_start_handshake,(or_connection_t *conn, int receiving))
 {
 
-#ifdef _QUIC_SOCK_
-  (void) conn;
-  (void) receiving;
-  return -1; 
-#else
   channel_listener_t *chan_listener;
   channel_t *chan;
 
@@ -1415,7 +1415,6 @@ connection_tls_start_handshake,(or_connection_t *conn, int receiving))
       return -1;
   }
   return 0;
-#endif
 }
 
 /** Block all future attempts to renegotiate on 'conn' */
@@ -2034,11 +2033,10 @@ connection_or_process_cells_from_inbuf(or_connection_t *conn)
   var_cell_t *var_cell;
 
   while (1) {
-    log_debug(LD_OR,
-              TOR_SOCKET_T_FORMAT": starting, inbuf_datalen %d "
-              "(%d pending in tls object).",
-              conn->base_.s,(int)connection_get_inbuf_len(TO_CONN(conn)),
-              tor_tls_get_pending_bytes(conn->tls));
+    log_debug(LD_OR,"sock %d: starting, inbuf_datalen %d ",
+              //"(%d pending in tls object).",
+              qs_get_fd(conn->base_.q_sock),(int)connection_get_inbuf_len(TO_CONN(conn)));
+              //tor_tls_get_pending_bytes(conn->tls));
     if (connection_fetch_var_cell_from_buf(conn, &var_cell)) {
       if (!var_cell)
         return 0; /* not yet. */

@@ -360,8 +360,8 @@ connection_add_impl(connection_t *conn, int is_connecting)
       /* XXXX CHECK FOR NULL RETURN! */
     }
 
-    log_debug(LD_NET,"Adding QUIC conn: new conn type %s, socket %lu, address %s, n_conns %d.",
-              conn_type_to_string(conn->type), qs_get_id(conn->q_sock), conn->address,
+    log_debug(LD_NET,"Adding QUIC conn: new conn type %s, socket %d, address %s, n_conns %d.",
+              conn_type_to_string(conn->type), qs_get_fd(conn->q_sock), conn->address,
               smartlist_len(connection_array));
   } else {
     if (!HAS_BUFFEREVENT(conn) && (SOCKET_OK(conn->s) || conn->linked)) {
@@ -386,12 +386,12 @@ connection_unregister_events(connection_t *conn)
 {
   if (conn->read_event) {
     if (event_del(conn->read_event))
-      log_warn(LD_BUG, "Error removing read event for %d", conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s);
+      log_warn(LD_BUG, "Error removing read event for %d", conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s);
     tor_free(conn->read_event);
   }
   if (conn->write_event) {
     if (event_del(conn->write_event))
-      log_warn(LD_BUG, "Error removing write event for %d", conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s);
+      log_warn(LD_BUG, "Error removing write event for %d", conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s);
     tor_free(conn->write_event);
   }
 #ifdef USE_BUFFEREVENTS
@@ -418,7 +418,7 @@ connection_remove(connection_t *conn)
   tor_assert(conn);
 
   log_debug(LD_NET,"removing socket %d (type %s), n_conns now %d",
-            conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s, conn_type_to_string(conn->type),
+            conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s, conn_type_to_string(conn->type),
             smartlist_len(connection_array));
 
   if (conn->type == CONN_TYPE_AP && conn->socket_family == AF_UNIX) {
@@ -614,7 +614,7 @@ connection_stop_reading,(connection_t *conn))
     if (event_del(conn->read_event))
       log_warn(LD_NET, "Error from libevent setting read event state for %d "
                "to unwatched: %s",
-               conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s,
+               conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s,
                tor_socket_strerror(tor_socket_errno(conn->s)));
   }
 }
@@ -640,7 +640,7 @@ connection_start_reading,(connection_t *conn))
     if (event_add(conn->read_event, NULL))
       log_warn(LD_NET, "Error from libevent setting read event state for %d "
                "to watched: %s",
-               conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s,
+               conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s,
                tor_socket_strerror(tor_socket_errno(conn->s)));
   }
 }
@@ -680,7 +680,7 @@ connection_stop_writing,(connection_t *conn))
     if (event_del(conn->write_event))
       log_warn(LD_NET, "Error from libevent setting write event state for %d "
                "to unwatched: %s",
-               conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s,
+               conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s,
                tor_socket_strerror(tor_socket_errno(conn->s)));
   }
 }
@@ -707,7 +707,7 @@ connection_start_writing,(connection_t *conn))
     if (event_add(conn->write_event, NULL)) {
       if (conn->use_quic) {
         log_warn(LD_NET, "Error from libevent setting write event state for %d",
-               (int)qs_get_id(conn->q_sock));
+               (int)qs_get_fd(conn->q_sock));
       } else {
         log_warn(LD_NET, "Error from libevent setting write event state for %d "
                "to watched: %s",
@@ -805,9 +805,14 @@ conn_read_callback(evutil_socket_t fd, short event, void *_conn)
   (void)fd;
   (void)event;
 
-  log_debug(LD_NET,"socket %d wants to read.",
-               conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s);
+  if (conn->use_quic) {
+    tor_assert(conn->q_sock); 
+    log_debug(LD_NET,"Got a callback on a quic-enabled socket %d: type %d, purpose: %d",
+               (int)qs_get_fd(conn->q_sock), conn->type, conn->purpose);
+  } else { 
 
+    log_debug(LD_NET,"socket %d wants to read.",conn->s);
+  }
   /* assert_connection_ok(conn, time(NULL)); */
 
   if (connection_handle_read(conn) < 0) {
@@ -816,7 +821,7 @@ conn_read_callback(evutil_socket_t fd, short event, void *_conn)
       log_warn(LD_BUG,"Unhandled error on read for %s connection "
                "(fd %d); removing",
                conn_type_to_string(conn->type),
-               conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s);
+               conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s);
       tor_fragile_assert();
 #endif
       if (CONN_IS_EDGE(conn))
@@ -839,9 +844,13 @@ conn_write_callback(evutil_socket_t fd, short events, void *_conn)
   (void)fd;
   (void)events;
 
-  LOG_FN_CONN(conn, (LOG_DEBUG, LD_NET, "socket %d wants to write.",
-                     conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s));
-
+  if (conn->use_quic) {
+    tor_assert(conn->q_sock); 
+    log_debug(LD_NET,"Got a write callback on a quic-enabled socket %d: type %d, purpose: %d",
+               (int)qs_get_fd(conn->q_sock), conn->type, conn->purpose);
+  } else { 
+    LOG_FN_CONN(conn, (LOG_DEBUG, LD_NET, "socket %d wants to write.", conn->s));
+  }
   /* assert_connection_ok(conn, time(NULL)); */
 
   if (connection_handle_write(conn, 0) < 0) {
@@ -850,7 +859,7 @@ conn_write_callback(evutil_socket_t fd, short events, void *_conn)
       log_fn(LOG_WARN,LD_BUG,
              "unhandled error on write for %s connection (fd %d); removing",
              conn_type_to_string(conn->type), 
-             conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s);
+             conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s);
       tor_fragile_assert();
       if (CONN_IS_EDGE(conn)) {
         /* otherwise we cry wolf about duplicate close */
@@ -907,7 +916,7 @@ conn_close_if_marked(int i)
 #endif
 
   log_debug(LD_NET,"Cleaning up connection (fd %d).",
-            conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s);
+            conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s);
 
   /* If the connection we are about to close was trying to connect to
   a proxy server and failed, the client won't be able to use that
@@ -926,7 +935,7 @@ conn_close_if_marked(int i)
                "Conn (addr %s, fd %d, type %s, state %d) marked, but wants "
                "to flush %d bytes. (Marked at %s:%d)",
                escaped_safe_str_client(conn->address),
-               conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s, 
+               conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s, 
                conn_type_to_string(conn->type), conn->state,
                (int)conn->outbuf_flushlen,
                 conn->marked_for_close_file, conn->marked_for_close);
@@ -958,7 +967,7 @@ conn_close_if_marked(int i)
       if (retval > 0) {
         LOG_FN_CONN(conn, (LOG_INFO,LD_NET,
                            "Holding conn (fd %d) open for more flushing.",
-                           conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s));
+                           conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s));
         conn->timestamp_lastwritten = now; /* reset so we can flush more */
       } else if (sz == 0) {
         /* Also, retval==0.  If we get here, we didn't want to write anything
@@ -1007,7 +1016,7 @@ conn_close_if_marked(int i)
              "(fd %d, type %s, state %d, marked at %s:%d).",
              (int)connection_get_outbuf_len(conn),
              escaped_safe_str_client(conn->address),
-             conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s, 
+             conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s, 
              conn_type_to_string(conn->type), conn->state,
              conn->marked_for_close_file,
              conn->marked_for_close);
@@ -1141,7 +1150,7 @@ run_connection_housekeeping(int i, time_t now)
         conn->timestamp_lastread
             + options->TestingDirConnectionMaxStall < now))) {
     log_info(LD_DIR,"Expiring wedged directory conn (fd %d, purpose %d)",
-            conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s, 
+            conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s, 
             conn->purpose);
     /* This check is temporary; it's to let us know whether we should consider
      * parsing partial serverdesc responses. */
@@ -1169,6 +1178,8 @@ run_connection_housekeeping(int i, time_t now)
   tor_assert(conn->outbuf);
 #endif
 
+  log_debug(LD_OR, "House-keeping or-conn: sock %d, type %d, purpose %d, state %d, or_conn->chan %p", 
+      (int)qs_get_fd(conn->q_sock), conn->type, conn->purpose, conn->state, (void*)or_conn->chan);
   chan = TLS_CHAN_TO_BASE(or_conn->chan);
   tor_assert(chan);
 
@@ -1185,7 +1196,7 @@ run_connection_housekeeping(int i, time_t now)
      * mark it now. */
     log_info(LD_OR,
              "Expiring non-used OR connection to fd %d (%s:%d) [Too old].",
-             conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s, 
+             conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s, 
              conn->address, conn->port);
     if (conn->state == OR_CONN_STATE_CONNECTING)
       connection_or_connect_failed(TO_OR_CONN(conn),
@@ -1196,7 +1207,7 @@ run_connection_housekeeping(int i, time_t now)
     if (past_keepalive) {
       /* We never managed to actually get this connection open and happy. */
       log_info(LD_OR,"Expiring non-open OR connection to fd %d (%s:%d).",
-               conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s, 
+               conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s, 
                conn->address, conn->port);
       connection_or_close_normally(TO_OR_CONN(conn), 0);
     }
@@ -1206,7 +1217,7 @@ run_connection_housekeeping(int i, time_t now)
     /* We're hibernating, there's no circuits, and nothing to flush.*/
     log_info(LD_OR,"Expiring non-used OR connection to fd %d (%s:%d) "
              "[Hibernating or exiting].",
-             conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s, 
+             conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s, 
              conn->address, conn->port);
     connection_or_close_normally(TO_OR_CONN(conn), 1);
   } else if (!have_any_circuits &&
@@ -1214,7 +1225,7 @@ run_connection_housekeeping(int i, time_t now)
                                          chan->timestamp_last_had_circuits) {
     log_info(LD_OR,"Expiring non-used OR connection to fd %d (%s:%d) "
              "[no circuits for %d; timeout %d; %scanonical].",
-             conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s, 
+             conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s, 
              conn->address, conn->port,
              (int)(now - chan->timestamp_last_had_circuits),
              or_conn->idle_timeout,
@@ -1226,7 +1237,7 @@ run_connection_housekeeping(int i, time_t now)
     log_fn(LOG_PROTOCOL_WARN,LD_PROTOCOL,
            "Expiring stuck OR connection to fd %d (%s:%d). (%d bytes to "
            "flush; %d seconds since last write)",
-           conn->use_quic ? (int)qs_get_id(conn->q_sock) : conn->s, 
+           conn->use_quic ? (int)qs_get_fd(conn->q_sock) : conn->s, 
            conn->address, conn->port,
            (int)connection_get_outbuf_len(conn),
            (int)(now-conn->timestamp_lastwritten));
@@ -2736,7 +2747,7 @@ dumpstats(int severity)
     if (conn->use_quic) {
       tor_log(severity, LD_GENERAL,
         "Conn %d (socket %d) type %d (%s), state %d (%s), created %d secs ago",
-        i, (int)qs_get_id(conn->q_sock), conn->type, conn_type_to_string(conn->type),
+        i, (int)qs_get_fd(conn->q_sock), conn->type, conn_type_to_string(conn->type),
         conn->state, conn_state_to_string(conn->type, conn->state),
         (int)(now - conn->timestamp_created));
     } else {
@@ -3580,7 +3591,8 @@ int
 tor_main(int argc, char *argv[])
 {
   int result = 0;
-  qs_init("./leaf_cert.pem", "./leaf_cert.key");
+  qs_init("/home/xli/Private/class/15744/tor/src/or/leaf_cert.pem", 
+      "/home/xli/Private/class/15744/tor/src/or/leaf_cert.key", 1);
 
 #ifdef _WIN32
   /* Call SetProcessDEPPolicy to permanently enable DEP.
