@@ -471,12 +471,8 @@ circuit_expire_building(void)
              MAX(get_circuit_build_close_time_ms()*2 + 1000,
                  options->SocksTimeout * 1000));
 
-  int num_circ = 0; 
   SMARTLIST_FOREACH_BEGIN(circuit_get_global_list(), circuit_t *,victim) {
     struct timeval cutoff;
-
-    log_debug(LD_NET, "%d-th CIRC", num_circ++);
-    circuit_log_path(LOG_DEBUG,LD_CIRC,TO_ORIGIN_CIRCUIT(victim));
     
     if (!CIRCUIT_IS_ORIGIN(victim) || /* didn't originate here */
         victim->marked_for_close)     /* don't mess with marked circs */
