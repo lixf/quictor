@@ -278,21 +278,21 @@ command_process_create_cell(cell_t *cell, channel_t *chan)
 
   /* If the high bit of the circuit ID is not as expected, close the
    * circ. */
-  if (chan->wide_circ_ids)
-    id_is_high = cell->circ_id & (1u<<31);
-  else
-    id_is_high = cell->circ_id & (1u<<15);
-  if ((id_is_high &&
-       chan->circ_id_type == CIRC_ID_TYPE_HIGHER) ||
-      (!id_is_high &&
-       chan->circ_id_type == CIRC_ID_TYPE_LOWER)) {
-    log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
-           "Received create cell with unexpected circ_id %u. Closing. circ_id_type %d, id_is_high %d",
-           (unsigned)cell->circ_id, chan->circ_id_type, id_is_high);
-    channel_send_destroy(cell->circ_id, chan,
-                         END_CIRC_REASON_TORPROTOCOL);
-    return;
-  }
+  //if (chan->wide_circ_ids)
+  //  id_is_high = cell->circ_id & (1u<<31);
+  //else
+  //  id_is_high = cell->circ_id & (1u<<15);
+  //if ((id_is_high &&
+  //     chan->circ_id_type == CIRC_ID_TYPE_HIGHER) ||
+  //    (!id_is_high &&
+  //     chan->circ_id_type == CIRC_ID_TYPE_LOWER)) {
+  //  log_fn(LOG_PROTOCOL_WARN, LD_PROTOCOL,
+  //         "Received create cell with unexpected circ_id %u. Closing. circ_id_type %d, id_is_high %d",
+  //         (unsigned)cell->circ_id, chan->circ_id_type, id_is_high);
+  //  channel_send_destroy(cell->circ_id, chan,
+  //                       END_CIRC_REASON_TORPROTOCOL);
+  //  return;
+  //}
 
   circ = or_circuit_new(cell->circ_id, chan);
   circ->base_.purpose = CIRCUIT_PURPOSE_OR;

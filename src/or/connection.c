@@ -1920,6 +1920,9 @@ connection_init_accepted_conn(connection_t *conn,
       
       tor_assert(or_conn->chan);
       connection_or_set_state_open(or_conn);
+
+      // also need to set a bunch of things in tls handshake
+      channel_set_circid_type(chan, NULL, 0);
       
       return 0;
       
@@ -4508,6 +4511,8 @@ connection_handle_write_impl_quic(connection_t *conn, int force)
       /* already marked */
       return -1;
     }
+
+    log_debug(LD_OR,"normal return");
     return 0;
   }
 
@@ -5369,15 +5374,15 @@ connection_finished_flushing(connection_t *conn)
 {
   tor_assert(conn);
 
-  /* If the connection is closed, don't try to do anything more here. */
+  /* This has to be an AND! */
   if (CONN_IS_CLOSED(conn) && !(QUICSOCK_OK(conn->q_sock))) {
     return 0;
   }
 
-//  log_fn(LOG_DEBUG,"entered. Socket %u.", conn->s);
+  log_debug(LD_NET, "Entered finished flushing");
 
 //  IF_HAS_NO_BUFFEREVENT(conn)
-    connection_stop_writing(conn);
+  connection_stop_writing(conn);
 
   switch (conn->type) {
     case CONN_TYPE_OR:
