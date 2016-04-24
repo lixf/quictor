@@ -1,3 +1,0 @@
-[submodule "src/simple-quic"]
-	path = src/simple-quic
-	url = git@github.com:kku1993/simple-quic.git
