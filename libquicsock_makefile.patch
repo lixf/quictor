@@ -1,0 +1,39 @@
+161a162,164
+> ################### LIBQUIC MOD ########################
+> LIBQUIC = -Lsrc/simple-quic -lquicsock
+> ########################################################
+770c773
+< DEFAULT_INCLUDES = -I.
+---
+> DEFAULT_INCLUDES = -I. -Isrc/simple-quic
+1593c1596
+< 	-lz -lm -levent -lssl -lcrypto \
+---
+> 	-lz -lm -levent -lssl -lcrypto $(LIBQUIC) \
+1796c1799
+< 	-lz -lm
+---
+> 	-lz -lm $(LIBQUIC) \
+1806a1810
+> 	$(LIBQUIC) \
+1824a1829
+> 	$(LIBQUIC) \
+1835c1840,1841
+< 	-lssl -lcrypto   
+---
+> 	-lssl -lcrypto  \
+> 	$(LIBQUIC) \
+1842c1848,1849
+< 	-lssl -lcrypto   
+---
+> 	-lssl -lcrypto \
+> 	$(LIBQUIC) \
+1850c1857,1858
+< 	 
+---
+> 	$(LIBQUIC) \
+> 
+1867a1876
+> 				$(LIBQUIC) \
+1887a1897
+> 				$(LIBQUIC) \
