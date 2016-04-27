@@ -66,7 +66,6 @@
 
 #ifdef _QUIC_SOCK_
 #include "quicsock/quicsock.h"
-#include "quicsock_util/libevent_plugin.h"
 #endif /* _QUIC_SOCK_ */
 
 /* ===== Compiler compatibility */

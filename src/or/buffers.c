@@ -775,7 +775,9 @@ flush_chunk_quic(tor_quicsock_t s, buf_t *buf,
     sz = chunk->datalen;
   
   //print_cell_to_log(chunk->data, sz);
+  log_debug(LD_OR, "going to call qs_send");
   write_result = qs_send(s, chunk->data, sz, stream);
+  log_debug(LD_OR, "returned from qs_send");
 
   if (write_result < 0) {
     log_warn(LD_NET,"QUIC write failed, returning.");
@@ -805,11 +807,15 @@ flush_buf_quic(tor_quicsock_t s, buf_t *buf, size_t sz, int stream) {
     else
       flushlen0 = buf->head->datalen;
     
+    log_debug(LD_OR, "going to call chunk");
     r = flush_chunk_quic(s, buf, buf->head, flushlen0, stream);
+    log_debug(LD_OR, "returned from chunk");
     
     check();
-    if (r < 0 || (size_t)r != flushlen0)
+    if (r < 0 || (size_t)r != flushlen0) {
+      log_debug(LD_OR, "returning -1, r = %d", r);
       return -1;
+    }
     
     flushed += r;
     sz -= r;

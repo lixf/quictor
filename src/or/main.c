@@ -348,10 +348,6 @@ connection_add_impl(connection_t *conn, int is_connecting)
     tor_assert(tor_libevent_get_base() != NULL);
     tor_assert(conn->q_sock != NULL);
 
-    quicsock_event_handler_t alarm = qs_get_event_handler(conn->q_sock); 
-    tor_assert(alarm != NULL);
-    qs_util_set_libevent_handler_base(alarm, tor_libevent_get_base());
-
     if (QUICSOCK_OK(conn->q_sock) || conn->linked) {
       conn->read_event = tor_event_new(tor_libevent_get_base(),
            fd, EV_READ|EV_PERSIST, conn_read_callback, conn);
@@ -3592,7 +3588,7 @@ tor_main(int argc, char *argv[])
 {
   int result = 0;
   qs_init("/home/xli/Private/class/15744/tor/src/or/leaf_cert.pem", 
-      "/home/xli/Private/class/15744/tor/src/or/leaf_cert.key", 1);
+      "/home/xli/Private/class/15744/tor/src/or/leaf_cert.key", 0);
 
 #ifdef _WIN32
   /* Call SetProcessDEPPolicy to permanently enable DEP.

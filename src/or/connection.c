@@ -411,7 +411,7 @@ connection_init(time_t now, connection_t *conn, int type, int socket_family)
     case CONN_TYPE_EXT_OR:
       conn->magic = OR_CONNECTION_MAGIC;
       conn->use_quic = 1; 
-      conn->q_sock = qs_open(qs_util_get_libevent_handler()); 
+      conn->q_sock = qs_open(); 
       break;
     case CONN_TYPE_EXIT:
       conn->magic = EDGE_CONNECTION_MAGIC;
@@ -428,7 +428,7 @@ connection_init(time_t now, connection_t *conn, int type, int socket_family)
     CASE_QUIC_LISTENER_TYPE:
       conn->magic = LISTENER_CONNECTION_MAGIC;
       conn->use_quic = 1; 
-      conn->q_sock = qs_open(qs_util_get_libevent_handler()); 
+      conn->q_sock = qs_open(); 
       break;
     CASE_NOQUIC_LISTENER_TYPE:
       conn->magic = LISTENER_CONNECTION_MAGIC;
@@ -1135,7 +1135,7 @@ connection_listener_new_quic(const struct sockaddr *listensockaddr,
     log_notice(LD_NET, "QUIC Opening %s on %s",
                conn_type_to_string(type), fmt_addrport(&addr, usePort));
 
-    q_sock = qs_open(qs_util_get_libevent_handler()); 
+    q_sock = qs_open(); 
 
     if (!QUICSOCK_OK(q_sock)) {
       int e = tor_socket_errno(s);
@@ -2089,9 +2089,9 @@ connection_connect_sockaddr_quic(connection_t *conn,
 
   s = conn->q_sock;
   // handle the alarm needed for QUIC since we are going to use this socket
-  quicsock_event_handler_t e_handler = qs_get_event_handler(s); 
-  tor_assert(e_handler != NULL);
-  qs_util_set_libevent_handler_base(e_handler, tor_libevent_get_base());
+  //quicsock_event_handler_t e_handler = qs_get_event_handler(s); 
+  //tor_assert(e_handler != NULL);
+  //qs_util_set_libevent_handler_base(e_handler, tor_libevent_get_base());
 
   if (! SOCKET_OK(s)) {
     /*
