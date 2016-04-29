@@ -3764,7 +3764,6 @@ connection_handle_read_impl(connection_t *conn)
   if (conn->marked_for_close)
     return 0; /* do nothing */
 
-  log_notice(LD_NET, "Entered, use_quic %d", conn->use_quic);
   conn->timestamp_lastread = approx_time();
 
   switch (conn->type) {
