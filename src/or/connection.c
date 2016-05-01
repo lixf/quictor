@@ -3866,9 +3866,9 @@ connection_handle_read_impl(connection_t *conn)
       connection_stop_reading_from_linked_conn(conn);
   }
   /* If we hit the EOF, call connection_reached_eof(). */
-  if (!conn->marked_for_close && conn->inbuf_reached_eof) {
-    log_notice(LD_NET, "WARNING! EOF");
-  }
+  //if (!conn->marked_for_close && conn->inbuf_reached_eof) {
+  //  log_notice(LD_NET, "WARNING! EOF");
+  //}
   if (!conn->marked_for_close &&
       conn->inbuf_reached_eof &&
       connection_reached_eof(conn) < 0) {
