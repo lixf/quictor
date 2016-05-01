@@ -4462,6 +4462,11 @@ typedef struct {
    * ed25519 identity key except from tor --keygen */
   int OfflineMasterKey;
 
+  // Quictor mod
+  char *ForceEntryNode;
+  char *ForceMiddleNode;
+  char *ForceExitNode;
+
   enum {
     FORCE_PASSPHRASE_AUTO=0,
     FORCE_PASSPHRASE_ON,

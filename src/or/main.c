@@ -3587,8 +3587,13 @@ int
 tor_main(int argc, char *argv[])
 {
   int result = 0;
-  qs_init("/home/xli/Private/class/15744/tor/src/or/leaf_cert.pem", 
-      "/home/xli/Private/class/15744/tor/src/or/leaf_cert.key", 0);
+
+  const char *cert_path = getenv("QUICTOR_CERT_PATH");
+  const char *key_path = getenv("QUICTOR_KEY_PATH");
+  tor_assert(cert_path != NULL);
+  tor_assert(key_path != NULL);
+
+  qs_init(cert_path, key_path, 0);
 
 #ifdef _WIN32
   /* Call SetProcessDEPPolicy to permanently enable DEP.

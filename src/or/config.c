@@ -522,6 +522,12 @@ static config_var_t option_vars_[] = {
   V(TestingDirAuthVoteHSDir, ROUTERSET, NULL),
   V(TestingDirAuthVoteHSDirIsStrict,  BOOL,     "0"),
   VAR("___UsingTestNetworkDefaults", BOOL, UsingTestNetworkDefaults_, "0"),
+  
+  // Quictor mod
+  VAR("ForceEntryNode",  STRING,   ForceEntryNode,  NULL),
+  VAR("ForceMiddleNode", STRING,   ForceMiddleNode, NULL),
+  VAR("ForceExitNode",   STRING,   ForceExitNode,   NULL),
+
 
   { NULL, CONFIG_TYPE_OBSOLETE, 0, NULL }
 };
