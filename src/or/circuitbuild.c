@@ -1564,6 +1564,12 @@ choose_good_exit_server_general(int need_uptime, int need_capacity)
   const or_options_t *options = get_options();
   const smartlist_t *the_nodes;
   const node_t *node=NULL;
+  
+  // QUICtor Mod
+  /* JCR to force a specified exit node */
+  if (options->ForceExitNode) {
+      return node_get_by_nickname(options->ForceExitNode, 0);
+  }
 
   connections = get_connection_array();
 
@@ -2105,6 +2111,12 @@ choose_good_middle_server(uint8_t purpose,
   router_crn_flags_t flags = CRN_NEED_DESC;
   tor_assert(CIRCUIT_PURPOSE_MIN_ <= purpose &&
              purpose <= CIRCUIT_PURPOSE_MAX_);
+    
+  // Quictor Mod
+  /* JCR to force a specified middle node */
+  if (options->ForceMiddleNode) {
+      return node_get_by_nickname(options->ForceMiddleNode, 0);
+  }
 
   log_debug(LD_CIRC, "Contemplating intermediate hop %d: random choice.",
             cur_len);
@@ -2146,6 +2158,12 @@ choose_good_entry_server(uint8_t purpose, cpath_build_state_t *state)
   const or_options_t *options = get_options();
   router_crn_flags_t flags = CRN_NEED_GUARD|CRN_NEED_DESC;
   const node_t *node;
+    
+  // Quictor Mod
+  /* JCR to force a specified middle node */
+  if (options->ForceEntryNode) {
+      return node_get_by_nickname(options->ForceEntryNode, 0);
+  }
 
   if (state && options->UseEntryGuards &&
       (purpose != CIRCUIT_PURPOSE_TESTING || options->BridgeRelay)) {
