@@ -828,7 +828,9 @@ connection_ap_attach_pending(int retry)
       continue;
     }
 
+    log_debug(LD_OR, "trying to attach ap conn to port %d", (int)conn->port);
     if (connection_ap_handshake_attach_circuit(entry_conn) < 0) {
+      log_warn(LD_OR, "ap_handshake_attch_circ failed somehow");
       if (!conn->marked_for_close)
         connection_mark_unattached_ap(entry_conn,
                                       END_STREAM_REASON_CANT_ATTACH);
@@ -838,6 +840,7 @@ connection_ap_attach_pending(int retry)
         conn->type == CONN_TYPE_AP &&
         conn->state == AP_CONN_STATE_CIRCUIT_WAIT) {
       if (!smartlist_contains(pending_entry_connections, entry_conn)) {
+        log_warn(LD_OR, "adding this conn back to the pending list for next time");
         smartlist_add(pending_entry_connections, entry_conn);
         continue;
       }

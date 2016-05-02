@@ -280,6 +280,8 @@ circuit_get_best(const entry_connection_t *conn,
 
   tor_gettimeofday(&now);
 
+  log_debug(LD_NET, "Going to look for best circuit");
+
   SMARTLIST_FOREACH_BEGIN(circuit_get_global_list(), circuit_t *, circ) {
     origin_circuit_t *origin_circ;
     if (!CIRCUIT_IS_ORIGIN(circ))
@@ -293,6 +295,11 @@ circuit_get_best(const entry_connection_t *conn,
         intro_going_on_but_too_old = 1;
         continue;
     }
+  
+    log_debug(LD_NET, "circ_id %d, has opened=%d, in base circ state=%d", 
+        (int)(TO_CIRCUIT(origin_circ))->n_circ_id, 
+        (int)origin_circ->has_opened, 
+        (int)(TO_CIRCUIT(origin_circ))->state);
 
     if (!circuit_is_acceptable(origin_circ,conn,must_be_open,purpose,
                                need_uptime,need_internal, (time_t)now.tv_sec))
