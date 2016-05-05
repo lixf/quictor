@@ -4465,7 +4465,7 @@ connection_handle_write_impl_quic(connection_t *conn, int force)
     
     log_debug(LD_OR, "Starting to write now want to send %d, outbuf_len %d", (int)max_to_write, (int)conn->outbuf_flushlen);
 
-    result = flush_buf_quic(conn->q_sock, conn->outbuf, max_to_write, 0);
+    result = flush_buf_quic(conn->q_sock, conn->outbuf, max_to_write);
     log_debug(LD_OR, "Finished writing, result %d", result);
     if (result < 0) {
       log_warn(LD_BUG, "QUIC sending failed on %d", qs_get_fd(conn->q_sock));
@@ -4840,10 +4840,19 @@ MOCK_IMPL(void,
 connection_write_to_buf_impl_,(const char *string, size_t len,
                                connection_t *conn, int zlib))
 {
+    // separate out for using QUIC conveniently
+    connection_write_to_buf_impl_generic(string, len, conn, zlib, (quicsock_stream_id_t)0);
+}
 
+
+MOCK_IMPL(void,
+connection_write_to_buf_impl_generic, (const char *string, size_t len,
+                               connection_t *conn, int zlib, 
+                               quicsock_stream_id_t stream_id))
+{
   if (conn->use_quic) {
-    log_debug(LD_OR, "connection_write_to_buf_impl_ invoked! going to receive write events!");
-    log_debug(LD_OR, "content: %s", string);
+    log_debug(LD_OR, "connection_write_to_buf_impl_ invoked on stream %lld", 
+                        (long long unsigned int)stream_id);
   }
 
   /* XXXX This function really needs to return -1 on failure. */
@@ -4880,7 +4889,7 @@ connection_write_to_buf_impl_,(const char *string, size_t len,
                                                  dir_conn->zlib_state,
                                                  string, len, done));
   } else {
-    CONN_LOG_PROTECT(conn, r = write_to_buf(string, len, conn->outbuf));
+    CONN_LOG_PROTECT(conn, r = write_to_buf_quic(string, len, conn->outbuf, stream_id));
   }
   if (r < 0) {
     if (CONN_IS_EDGE(conn)) {

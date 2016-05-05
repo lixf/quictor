@@ -143,14 +143,36 @@ MOCK_DECL(void, connection_write_to_buf_impl_,
 /* DOCDOC connection_write_to_buf */
 static void connection_write_to_buf(const char *string, size_t len,
                                     connection_t *conn);
-/* DOCDOC connection_write_to_buf_zlib */
-static void connection_write_to_buf_zlib(const char *string, size_t len,
-                                         dir_connection_t *conn, int done);
 static inline void
 connection_write_to_buf(const char *string, size_t len, connection_t *conn)
 {
   connection_write_to_buf_impl_(string, len, conn, 0);
 }
+
+
+/* QUIC supported stream ID implementation */
+MOCK_DECL(void, connection_write_to_buf_impl_generic,
+          (const char *string, size_t len, connection_t *conn, int zlib, 
+           quicsock_stream_id_t stream_id));
+
+// Public API
+static void connection_write_to_buf_generic(const char *string, size_t len, 
+                                    connection_t *conn, streamid_t stream_id);
+// Private redirection
+static inline void
+connection_write_to_buf_generic(const char *string, size_t len, connection_t *conn, 
+                                streamid_t stream_id)
+{
+  connection_write_to_buf_impl_generic(string, len, conn, 0, 
+                                        (quicsock_stream_id_t)stream_id);
+}
+
+/*** QUIC code ends here ***/
+
+
+/* DOCDOC connection_write_to_buf_zlib */
+static void connection_write_to_buf_zlib(const char *string, size_t len,
+                                         dir_connection_t *conn, int done);
 static inline void
 connection_write_to_buf_zlib(const char *string, size_t len,
                              dir_connection_t *conn, int done)

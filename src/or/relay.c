@@ -1918,16 +1918,22 @@ connection_edge_package_raw_inbuf(edge_connection_t *conn, int package_partial,
     connection_fetch_from_buf(payload, length, TO_CONN(conn));
   }
 
-  log_debug(domain,TOR_SOCKET_T_FORMAT": Packaging %d bytes (%d waiting).",
+  if (conn->base_.use_quic) {
+    log_debug(domain,"quic_sock %d: Packaging %d bytes (%d waiting).",
+            (int)qs_get_fd(conn->base_.q_sock),
+            (int)length, (int)connection_get_inbuf_len(TO_CONN(conn)));
+  } else {
+    log_debug(domain,TOR_SOCKET_T_FORMAT": Packaging %d bytes (%d waiting).",
             conn->base_.s,
             (int)length, (int)connection_get_inbuf_len(TO_CONN(conn)));
-
+  }
   if (sending_optimistically && !sending_from_optimistic) {
     /* This is new optimistic data; remember it in case we need to detach and
        retry */
     if (!entry_conn->pending_optimistic_data)
       entry_conn->pending_optimistic_data = generic_buffer_new();
-    generic_buffer_add(entry_conn->pending_optimistic_data, payload, length);
+    generic_buffer_add_quic(entry_conn->pending_optimistic_data, payload, length, 
+                        (quicsock_stream_id_t)conn->stream_id);
   }
 
   if (connection_edge_send_command(conn, RELAY_COMMAND_DATA,
@@ -2323,10 +2329,13 @@ cell_queue_append(cell_queue_t *queue, packed_cell_t *cell)
 void
 cell_queue_append_packed_copy(circuit_t *circ, cell_queue_t *queue,
                               int exitward, const cell_t *cell,
-                              int wide_circ_ids, int use_stats)
+                              int wide_circ_ids, int use_stats, 
+                              streamid_t stream_id)
 {
   struct timeval now;
   packed_cell_t *copy = packed_cell_copy(cell, wide_circ_ids);
+  // QUIC mod: TEMP -> ideally add into packed_cell_copy()
+  copy->stream_id = stream_id; // 0 for most cases
   (void)circ;
   (void)exitward;
   (void)use_stats;
@@ -2827,7 +2836,7 @@ append_cell_to_circuit_queue(circuit_t *circ, channel_t *chan,
 #endif
 
   cell_queue_append_packed_copy(circ, queue, exitward, cell,
-                                chan->wide_circ_ids, 1);
+                                chan->wide_circ_ids, 1, fromstream);
 
   if (PREDICT_UNLIKELY(cell_queues_check_size())) {
     /* We ran the OOM handler */

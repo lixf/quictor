@@ -89,6 +89,7 @@ circuit_is_acceptable(const origin_circuit_t *origin_circ,
   if (origin_circ->unusable_for_new_conns)
     return 0;
 
+  log_debug(LD_CIRC,"Going to test for uptime");
   /* decide if this circ is suitable for this conn */
 
   /* for rend circs, circ->cpath->prev is not the last router in the
@@ -102,6 +103,8 @@ circuit_is_acceptable(const origin_circuit_t *origin_circ,
     return 0;
   if (need_internal != build_state->is_internal)
     return 0;
+      
+  log_debug(LD_CIRC,"Going to test for C_GENERAL");
 
   if (purpose == CIRCUIT_PURPOSE_C_GENERAL) {
     tor_addr_t addr;
@@ -119,17 +122,23 @@ circuit_is_acceptable(const origin_circuit_t *origin_circ,
       tor_assert(conn->chosen_exit_name);
       if (build_state->chosen_exit) {
         char digest[DIGEST_LEN];
-        if (hexdigest_to_digest(conn->chosen_exit_name, digest) < 0)
+        if (hexdigest_to_digest(conn->chosen_exit_name, digest) < 0) {
+          log_debug(LD_CIRC,"digest is bad #1");
           return 0; /* broken digest, we don't want it */
+        }
         if (tor_memneq(digest, build_state->chosen_exit->identity_digest,
-                          DIGEST_LEN))
+                          DIGEST_LEN)) {
+          log_debug(LD_CIRC,"digest is bad #2");
           return 0; /* this is a circuit to somewhere else */
+        }
         if (tor_digest_is_zero(digest)) {
           /* we don't know the digest; have to compare addr:port */
           if (family < 0 ||
               !tor_addr_eq(&build_state->chosen_exit->addr, &addr) ||
-              build_state->chosen_exit->port != conn->socks_request->port)
+              build_state->chosen_exit->port != conn->socks_request->port) {
+            log_debug(LD_CIRC,"digest is bad #3");
             return 0;
+          }
         }
       }
     } else {
@@ -138,6 +147,9 @@ circuit_is_acceptable(const origin_circuit_t *origin_circ,
         return 0;
       }
     }
+    
+    log_debug(LD_CIRC,"Made it after the one-hop digest nonsense");
+
     if (origin_circ->prepend_policy && family != -1) {
       int r = compare_tor_addr_to_addr_policy(&addr,
                                               conn->socks_request->port,
@@ -302,8 +314,10 @@ circuit_get_best(const entry_connection_t *conn,
         (int)(TO_CIRCUIT(origin_circ))->state);
 
     if (!circuit_is_acceptable(origin_circ,conn,must_be_open,purpose,
-                               need_uptime,need_internal, (time_t)now.tv_sec))
+                               need_uptime,need_internal, (time_t)now.tv_sec)) {
+      log_debug(LD_NET, "circ_id %d rejected", (int)(TO_CIRCUIT(origin_circ))->n_circ_id);
       continue;
+    }
 
     /* now this is an acceptable circ to hand back. but that doesn't
      * mean it's the *best* circ to hand back. try to decide.

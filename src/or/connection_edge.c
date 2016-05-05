@@ -2337,9 +2337,15 @@ connection_ap_handshake_send_begin(entry_connection_t *ap_conn)
   edge_conn->package_window = STREAMWINDOW_START;
   edge_conn->deliver_window = STREAMWINDOW_START;
   base_conn->state = AP_CONN_STATE_CONNECT_WAIT;
-  log_info(LD_APP,"Address/port sent, ap socket "TOR_SOCKET_T_FORMAT
-           ", n_circ_id %u",
-           base_conn->s, (unsigned)circ->base_.n_circ_id);
+  if (base_conn->use_quic) {
+    log_info(LD_APP,"QUIC: Address/port sent, ap socket %d"
+           ", n_circ_id %u", qs_get_fd(base_conn->q_sock), 
+           (unsigned)circ->base_.n_circ_id);
+
+  } else {
+    log_info(LD_APP,"Address/port sent, ap socket "TOR_SOCKET_T_FORMAT
+           ", n_circ_id %u", base_conn->s, (unsigned)circ->base_.n_circ_id);
+  }
   control_event_stream_status(ap_conn, STREAM_EVENT_SENT_CONNECT, 0);
 
   /* If there's queued-up data, send it now */

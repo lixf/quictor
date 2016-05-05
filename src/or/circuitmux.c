@@ -1891,8 +1891,11 @@ circuitmux_append_destroy_cell(channel_t *chan,
   cell.command = CELL_DESTROY;
   cell.payload[0] = (uint8_t) reason;
 
+  // QUIC MOD: pass in 0 for stream ID because we don't care about
+  // a destroy cell being blocked by HOL problem (it's already going
+  // to be slow!). 
   cell_queue_append_packed_copy(NULL, &cmux->destroy_cell_queue, 0, &cell,
-                                chan->wide_circ_ids, 0);
+                                chan->wide_circ_ids, 0, 0);
 
   /* Destroy entering the queue, update counters */
   ++(cmux->destroy_ctr);

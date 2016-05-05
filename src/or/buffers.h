@@ -35,13 +35,15 @@ int read_to_buf_quic(tor_quicsock_t s, size_t at_most, buf_t *buf, int *reached_
 int read_to_buf_tls(tor_tls_t *tls, size_t at_most, buf_t *buf);
 
 int flush_buf(tor_socket_t s, buf_t *buf, size_t sz, size_t *buf_flushlen);
-int flush_buf_quic(tor_quicsock_t s, buf_t *buf, size_t sz, int stream);
+int flush_buf_quic(tor_quicsock_t s, buf_t *buf, size_t sz);
 // debug
 void print_cell_to_log(char *buf, ssize_t len);
 //
 int flush_buf_tls(tor_tls_t *tls, buf_t *buf, size_t sz, size_t *buf_flushlen);
 
 int write_to_buf(const char *string, size_t string_len, buf_t *buf);
+int write_to_buf_quic(const char *string, size_t string_len, buf_t *buf, 
+                      quicsock_stream_id_t stream_id);
 int write_to_buf_zlib(buf_t *buf, tor_zlib_state_t *state,
                       const char *data, size_t data_len, int done);
 int move_buf_to_buf(buf_t *buf_out, buf_t *buf_in, size_t *buf_flushlen);
@@ -85,6 +87,7 @@ int fetch_ext_or_command_from_evbuffer(struct evbuffer *buf,
 #define generic_buffer_new() evbuffer_new()
 #define generic_buffer_len(b) evbuffer_get_length((b))
 #define generic_buffer_add(b,dat,len) evbuffer_add((b),(dat),(len))
+#define generic_buffer_add_quic(b,dat,len,stream) evbuffer_add((b),(dat),(len))
 #define generic_buffer_get(b,buf,buflen) evbuffer_remove((b),(buf),(buflen))
 #define generic_buffer_clear(b) evbuffer_drain((b), evbuffer_get_length((b)))
 #define generic_buffer_free(b) evbuffer_free((b))
@@ -94,6 +97,7 @@ int fetch_ext_or_command_from_evbuffer(struct evbuffer *buf,
 #define generic_buffer_new() buf_new()
 #define generic_buffer_len(b) buf_datalen((b))
 #define generic_buffer_add(b,dat,len) write_to_buf((dat),(len),(b))
+#define generic_buffer_add_quic(b,dat,len,stream) write_to_buf_quic((dat),(len),(b),(stream))
 #define generic_buffer_get(b,buf,buflen) fetch_from_buf((buf),(buflen),(b))
 #define generic_buffer_clear(b) buf_clear((b))
 #define generic_buffer_free(b) buf_free((b))
@@ -122,6 +126,9 @@ typedef struct chunk_t {
   char *data; /**< A pointer to the first byte of data stored in <b>mem</b>. */
   uint32_t inserted_time; /**< Timestamp in truncated ms since epoch
                            * when this chunk was inserted. */
+  quicsock_stream_id_t stream_id; /** QUIC mod: the stream ID passed to QUIC, 
+                                   *  will be 0 we are not using QUIC or it is 
+                                   *  not a relayed cell */
   char mem[FLEXIBLE_ARRAY_MEMBER]; /**< The actual memory used for storage in
                 * this chunk. */
 } chunk_t;

@@ -131,6 +131,7 @@ chunk_new_with_alloc_size(size_t alloc)
   ch->memlen = CHUNK_SIZE_WITH_ALLOC(alloc);
   total_bytes_allocated_in_chunks += alloc;
   ch->data = &ch->mem[0];
+  ch->stream_id = 0;
   return ch;
 }
 
@@ -767,17 +768,14 @@ print_cell_to_log(char *buf, ssize_t len) {
 
 /* TODO possibly merge the send calls */
 static inline int
-flush_chunk_quic(tor_quicsock_t s, buf_t *buf, 
-                 chunk_t *chunk, size_t sz, int stream) {
+flush_chunk_quic(tor_quicsock_t s, buf_t *buf, chunk_t *chunk, size_t sz) {
   ssize_t write_result;
 
   if (sz > chunk->datalen)
     sz = chunk->datalen;
   
   //print_cell_to_log(chunk->data, sz);
-  log_debug(LD_OR, "going to call qs_send");
-  write_result = qs_send(s, chunk->data, sz, stream);
-  log_debug(LD_OR, "returned from qs_send");
+  write_result = qs_send(s, chunk->data, sz, chunk->stream_id);
 
   if (write_result < 0) {
     log_warn(LD_NET,"QUIC write failed, returning.");
@@ -791,7 +789,7 @@ flush_chunk_quic(tor_quicsock_t s, buf_t *buf,
 
 
 int
-flush_buf_quic(tor_quicsock_t s, buf_t *buf, size_t sz, int stream) {
+flush_buf_quic(tor_quicsock_t s, buf_t *buf, size_t sz) {
   tor_assert(QUICSOCK_OK(s));
   
   int r; 
@@ -807,9 +805,7 @@ flush_buf_quic(tor_quicsock_t s, buf_t *buf, size_t sz, int stream) {
     else
       flushlen0 = buf->head->datalen;
     
-    log_debug(LD_OR, "going to call chunk");
-    r = flush_chunk_quic(s, buf, buf->head, flushlen0, stream);
-    log_debug(LD_OR, "returned from chunk");
+    r = flush_chunk_quic(s, buf, buf->head, flushlen0);
     
     check();
     if (r < 0 || (size_t)r != flushlen0) {
@@ -917,6 +913,15 @@ flush_buf_tls(tor_tls_t *tls, buf_t *buf, size_t flushlen,
  */
 int
 write_to_buf(const char *string, size_t string_len, buf_t *buf)
+{
+    return write_to_buf_quic(string, string_len, buf, (quicsock_stream_id_t)0);
+}
+
+
+// QUIC's write to buffer 
+int
+write_to_buf_quic(const char *string, size_t string_len, buf_t *buf, 
+             quicsock_stream_id_t stream_id)
 {
   if (!string_len)
     return (int)buf->datalen;
@@ -1156,6 +1161,11 @@ fetch_var_cell_from_evbuffer(struct evbuffer *buf, var_cell_t **out,
  * <b>buf_out</b>, and modify *<b>buf_flushlen</b> appropriately.
  * Return the number of bytes actually copied.
  */
+
+/* QUIC MOD: since this function is only used for linked_conn, we can
+ * safely assume that stream_id is not very useful since data never goes 
+ * to the network layer! 
+ * */
 int
 move_buf_to_buf(buf_t *buf_out, buf_t *buf_in, size_t *buf_flushlen)
 {

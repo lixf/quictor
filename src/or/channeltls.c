@@ -803,8 +803,10 @@ channel_tls_write_packed_cell_method(channel_t *chan,
   tor_assert(packed_cell);
 
   if (tlschan->conn) {
-    connection_write_to_buf(packed_cell->body, cell_network_size,
-                            TO_CONN(tlschan->conn));
+    log_debug(LD_CHANNEL, "Writing packed call onto channel, for stream %d", 
+                            (int)packed_cell->stream_id);
+    connection_write_to_buf_generic(packed_cell->body, cell_network_size,
+                            TO_CONN(tlschan->conn), packed_cell->stream_id);
 
     /* This is where the cell is finished; used to be done from relay.c */
     packed_cell_free(packed_cell);
