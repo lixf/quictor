@@ -3593,6 +3593,7 @@ tor_main(int argc, char *argv[])
   tor_assert(cert_path != NULL);
   tor_assert(key_path != NULL);
 
+  printf("Running QuicTor!\n");
   qs_init(cert_path, key_path);
 
 #ifdef _WIN32
