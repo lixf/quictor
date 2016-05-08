@@ -2,20 +2,25 @@
 ### Instructions to build QuicTor: 
 - autogen
 - configure --disable-asciidocs
-- patch the Makefile with libquicsock_makefile.patch
-- pull and build libquicsock (see below)
-- set environment variables for QUICTOR_CERT_PATH and QUICTOR_KEY_PATH
-- change LD_LIBRARY_PATH to include the path to src/simple-quic
+- Patch the Makefile by running `patch Makefile < libquicsock_makefile.patch`
+- Build libquicsock (see below)
+- Se up certificates for QUIC (see below)
 - make 
 
-### Instructions to build libquicsock
-- in quictor/, initialize submodule
-- go into src/simple-quic, initialize submodule
-- go further into lib/libquic and pull, change branch to kku1993-mod
-- make (or 'make debug' for debug logging) inside src/simple-quic
+### Instructions to build libquicsock:
+- in `quictor/`, run `git submodule init && git submodule update`
+- go into `src/simple-quic`, run `./init_repo.sh`
+- make (or 'make debug' for logging and assertions) inside src/simple-quic
 - fix all dependency problems by downloading needed packages (see below) 
 - wait ~5 mins for building
+- change `LD_LIBRARY_PATH` to include the path to src/simple-quic
 
-### Possible needed dependencies
-- for libquic: gccgo-go, ninja-build
-- others: libevent-dev
+### Instructions on generate certificates for QUIC:
+- use the scrips under `src/simple-quic/certs/` to generate cerificates
+- set environment variables for `QUICTOR_CERT_PATH` and `QUICTOR_KEY_PATH`
+  Set `QUICTOR_CERT_PATH` to point to `lead_cert.pem`
+  and `QUICTOR_KEY_PATH` to point to `lead_cert.key`.
+
+### External dependencies:
+- for libquic: `go` (`gccgo-go` on Ubuntu)
+- for libquicsock: `libevent` (`libevent-dev` on Ubuntu)
