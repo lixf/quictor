@@ -3590,10 +3590,12 @@ tor_main(int argc, char *argv[])
 
   const char *cert_path = getenv("QUICTOR_CERT_PATH");
   const char *key_path = getenv("QUICTOR_KEY_PATH");
-  tor_assert(cert_path != NULL);
-  tor_assert(key_path != NULL);
+  if (cert_path == NULL || key_path == NULL) {
+    log_fn(LOG_WARN, LD_BUG, "QUIC does not have cert_path or key_path");
+    exit(-1);
+  }
 
-  printf("Running QuicTor!\n");
+  //printf("Running QuicTor!\n");
   qs_init(cert_path, key_path);
 
 #ifdef _WIN32
