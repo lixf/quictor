@@ -1,15 +1,15 @@
 161a162,164
 > ################### LIBQUIC MOD ########################
-> LIBQUIC = -Lsrc/simple-quic -lquicsock
+> LIBQUIC = -L/home/ubuntu/.shadow/lib -lquicsock
 > ########################################################
 770c773
 < DEFAULT_INCLUDES = -I.
 ---
-> DEFAULT_INCLUDES = -I. -Isrc/simple-quic
-1593c1596
-< 	-lz -lm -levent -lssl -lcrypto \
+> DEFAULT_INCLUDES = -I. -I/home/ubuntu/shadow-plugin-tor/build/tor/src/simple-quic
+1604c1607
+< 	-lz -lm /home/ubuntu/.shadow/lib/libevent.a  /home/ubuntu/.shadow/lib/libssl.a /home/ubuntu/.shadow/lib/libcrypto.a \
 ---
-> 	-lz -lm -levent -lssl -lcrypto $(LIBQUIC) \
+> 	-lz -lm /home/ubuntu/.shadow/lib/libevent.a  /home/ubuntu/.shadow/lib/libssl.a /home/ubuntu/.shadow/lib/libcrypto.a $(LIBQUIC) \
 1796c1799
 < 	-lz -lm
 ---
@@ -19,14 +19,14 @@
 1824a1829
 > 	$(LIBQUIC) \
 1835c1840,1841
-< 	-lssl -lcrypto   
+< 	/home/ubuntu/.shadow/lib/libssl.a /home/ubuntu/.shadow/lib/libcrypto.a   
 ---
-> 	-lssl -lcrypto  \
+> 	/home/ubuntu/.shadow/lib/libssl.a /home/ubuntu/.shadow/lib/libcrypto.a  \
 > 	$(LIBQUIC) \
 1842c1848,1849
-< 	-lssl -lcrypto   
+< 	/home/ubuntu/.shadow/lib/libssl.a /home/ubuntu/.shadow/lib/libcrypto.a   
 ---
-> 	-lssl -lcrypto \
+> 	/home/ubuntu/.shadow/lib/libssl.a /home/ubuntu/.shadow/lib/libcrypto.a \
 > 	$(LIBQUIC) \
 1850c1857,1858
 < 	 

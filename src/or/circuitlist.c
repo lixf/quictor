@@ -350,6 +350,9 @@ circuit_set_p_circid_chan(or_circuit_t *or_circ, circid_t id,
     channel_mark_circid_unusable(old_chan, old_id);
     circ->p_delete_pending = 0;
   }
+ // if(! CIRCUIT_IS_ORIGIN(circ))
+   //   log_info(LD_CIRC,"Lamiaa: or_circ->p_chan->identity_digest = %s", or_circ->p_chan->identity_digest);
+
 }
 
 /** Set the n_conn field of a circuit <b>circ</b>, along

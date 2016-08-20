@@ -185,7 +185,8 @@ circuit_receive_relay_cell(cell_t *cell, circuit_t *circ,
   crypt_path_t *layer_hint=NULL;
   char recognized=0;
   int reason;
-
+//  if(! CIRCUIT_IS_ORIGIN(circ))
+//    log_info(LD_CIRC,"Lamiaa: or_circ->p_chan->identity_digest = %s", TO_OR_CIRCUIT(circ)->p_chan->identity_digest);
   tor_assert(cell);
   tor_assert(circ);
   tor_assert(cell_direction == CELL_DIRECTION_OUT ||

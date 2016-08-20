@@ -1992,6 +1992,8 @@ onion_pick_cpath_exit(origin_circuit_t *circ, extend_info_t *exit)
     tor_assert(exit);
   }
   state->chosen_exit = exit;
+  log_info(LD_EXIT,"Lamiaa: exit->identity_digest = %s",exit->identity_digest);
+
   return 0;
 }
 
@@ -2005,7 +2007,6 @@ circuit_append_new_exit(origin_circuit_t *circ, extend_info_t *exit)
   cpath_build_state_t *state;
   tor_assert(exit);
   tor_assert(circ);
-
   state = circ->build_state;
   tor_assert(state);
   extend_info_free(state->chosen_exit);

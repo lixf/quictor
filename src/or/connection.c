@@ -1923,7 +1923,7 @@ connection_init_accepted_conn(connection_t *conn,
 
       // also need to set a bunch of things in tls handshake
       channel_set_circid_type(chan, NULL, 0);
-      
+      log_info(LD_OR,"Lamiaa: or digest = %s",or_conn->identity_digest);
       return 0;
       
       break;
