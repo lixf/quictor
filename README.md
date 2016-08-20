@@ -1,4 +1,14 @@
 # QuicTor
+
+## Instructions for Running Shadow:
+- Follow the normal process to build `libquicsock`.
+- `cp libquicsock.so ~/.shadow/lib`
+- `cd ~/shadow-plugin-tor`
+- `./build_cmd.sh`
+- `./setup install`
+- `cd ~/shadow-plugin-tor/resource/quic`
+- `shadow-tor -i shadow.config.xml`
+
 ### Instructions to build QuicTor: 
 - autogen
 - configure --disable-asciidocs
